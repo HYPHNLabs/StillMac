@@ -163,4 +163,12 @@ class DistributionTests(unittest.TestCase):
    p=pathlib.Path(d); pkg(p); (p/'SHA256SUMS').write_text((p/'SHA256SUMS').read_text()+'0'*64+'  extra\n'); self.assertNotEqual(run([str(SCRIPTS/'update-formula.sh'),'v0.1.0',str(p),str(p/'f')]).returncode,0)
  def test_docs_remove_purge_claims(self):
   for n in ('README.md','INSTALL.md','UNINSTALL.md','docs/DISTRIBUTION-CONTRACT.md','skills/stillmac/SKILL.md'): self.assertNotIn('--purge-data',(ROOT/n).read_text())
+ def test_readme_documents_only_real_cli_commands_and_inactive_install_routes(self):
+  text=(ROOT/'README.md').read_text()
+  for command in ('stillmac doctor','stillmac sample','stillmac status','stillmac report','stillmac report --format json','stillmac report --format markdown','stillmac help'):
+   self.assertIn(command,text)
+  self.assertIn('There is no `stillmac learn` command',text)
+  self.assertIn('brew install HYPHNLabs/tap/stillmac',text)
+  self.assertIn('npx skills add HYPHNLabs/StillMac -g',text)
+  self.assertIn('**neither is active yet**',text)
 if __name__=='__main__': unittest.main(verbosity=2)

@@ -19,6 +19,47 @@ This repository is a **pre-release beta candidate**. The implemented surface is 
 
 StillMac has no scheduler, network access, telemetry, cache inspection, port inspection, recommendations, or active remediation. The repository now contains inspect-first installer/update/uninstaller scripts and an Agent Skill; remote release, npx activation, and Homebrew installation remain unavailable until separately activated by a real release workflow. A short release-candidate soak does not count as a completed seven-day observation period.
 
+## Quick start
+
+After installing or [building from source](#build-from-source), run:
+
+```bash
+stillmac doctor
+stillmac sample
+stillmac status
+stillmac report --format markdown
+```
+
+`sample` records one explicit observation. Run it again only when you intentionally want another observation; StillMac does not schedule collection automatically. There is no `stillmac learn` command—the bounded history created by repeated `sample` calls is the learning record used by `status`.
+
+## Command reference
+
+| Command | Purpose |
+|---|---|
+| `stillmac doctor` | Validate macOS probes and the selected local data directory. |
+| `stillmac sample` | Collect and store one explicit process-and-memory observation. |
+| `stillmac status` | Report progress toward the seven-day coverage threshold. |
+| `stillmac report` | Render the latest observation as Markdown (the default). |
+| `stillmac report --format json` | Render the latest observation as JSON. |
+| `stillmac report --format markdown` | Render the latest observation as Markdown explicitly. |
+| `stillmac help` | Show CLI usage. |
+
+Every operational command accepts `--data-dir PATH` or `--data-dir=PATH`. Without it, StillMac uses `$HOME/Library/Application Support/StillMac`.
+
+## One-line installation routes
+
+These are the intended copy-and-paste routes, but **neither is active yet** because no GitHub Release, Homebrew tap, or public Agent Skill source exists. Do not run them until the first release is activated and this notice is removed.
+
+```bash
+# StillMac CLI — future Homebrew route
+brew install HYPHNLabs/tap/stillmac
+
+# StillMac Agent Skill — future cross-agent route (does not itself replace the CLI binary)
+npx skills add HYPHNLabs/StillMac -g
+```
+
+The Homebrew command installs the CLI. The `npx skills add` command installs the thin Agent Skill that invokes the same CLI; it is not a second implementation of StillMac.
+
 ## Compatibility
 
 - **Executed locally:** Apple Silicon, macOS 26.5
