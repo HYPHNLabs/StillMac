@@ -10,44 +10,7 @@ StillMac learns what is normal on your Mac so future cleanup decisions can be ev
 
 ## How StillMac works
 
-```text
-AVAILABLE NOW — READ-ONLY
-
-  macOS process + memory signals
-                │
-                ▼
-       explicit `stillmac sample`
-                │
-                ▼
-       bounded private history
-                │
-          ┌─────┴─────┐
-          ▼           ▼
-       status       report
-    coverage view   evidence view
-
-────────────────────────────────────────────────────
-
-FUTURE — SEPARATELY DESIGNED, TESTED, AND APPROVED
-
-  learned patterns + current-state revalidation
-                │
-                ▼
-  classify cleanup candidates
-  (caches, stale worktrees, and other reviewed files)
-                │
-                ▼
-       explain evidence + dry run
-                │
-                ▼
-         explicit user approval
-                │
-                ▼
-       quarantine / rollback controls
-                │
-                ▼
-          verified deletion + action log
-```
+![StillMac evidence-led cleanup workflow: current read-only capabilities and separately approval-gated future cleanup](docs/assets/stillmac-workflow.svg)
 
 StillMac's objective is not blind cleanup. It is to learn recurring patterns first, distinguish active resources from credible stale candidates, and make any future deletion inspectable and user-approved. Cache inspection, worktree classification, recommendations, quarantine, and deletion are **not implemented in the current beta**.
 

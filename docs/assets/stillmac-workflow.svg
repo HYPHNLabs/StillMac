@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="650" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">StillMac evidence-led cleanup architecture</title>
+  <desc id="desc">Two horizontal rows. The current read-only workflow observes Mac process and memory signals, records explicit samples in private history, and produces status and reports. A separate coming-soon workflow would learn patterns, classify cleanup candidates such as caches and stale worktrees, preview a dry run, require approval, support quarantine and rollback, and verify cleanup.</desc>
+  <defs>
+    <marker id="arrow-current" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#51606f"/>
+    </marker>
+    <marker id="arrow-future" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#7d5a1f"/>
+    </marker>
+    <style>
+      .board { fill: #ffffff; stroke: #d4dbe2; stroke-width: 2; }
+      .row-current { fill: #f5f8fb; stroke: #9aabba; stroke-width: 2; }
+      .row-future { fill: #fffaf0; stroke: #c7a86b; stroke-width: 2; stroke-dasharray: 8 6; }
+      .current-box { fill: #ffffff; stroke: #607487; stroke-width: 2; }
+      .future-box { fill: #ffffff; stroke: #a67c35; stroke-width: 2; stroke-dasharray: 6 4; }
+      .gate { fill: #f8f2e6; stroke: #a67c35; stroke-width: 2; }
+      .title { fill: #18232d; font: 700 25px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .subtitle { fill: #53616e; font: 500 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .label-current { fill: #30485d; font: 700 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 1px; }
+      .label-future { fill: #79591f; font: 700 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 1px; }
+      .box-title { fill: #1d2a35; font: 700 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .box-copy { fill: #52606c; font: 500 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .gate-copy { fill: #79591f; font: 700 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .current-line { stroke: #51606f; stroke-width: 2.5; fill: none; marker-end: url(#arrow-current); }
+      .future-line { stroke: #7d5a1f; stroke-width: 2.5; fill: none; marker-end: url(#arrow-future); }
+    </style>
+  </defs>
+
+  <rect class="board" x="1" y="1" width="1198" height="648" rx="18"/>
+  <text class="title" x="40" y="47">HOW STILLMAC WORKS</text>
+  <text class="subtitle" x="40" y="73">Learn first. Explain the evidence. Clean only with explicit approval.</text>
+
+  <rect class="row-current" x="30" y="100" width="1140" height="205" rx="14"/>
+  <text class="label-current" x="55" y="132">CURRENT · READ-ONLY</text>
+
+  <rect class="current-box" x="55" y="158" width="180" height="100" rx="10"/>
+  <text class="box-title" x="145" y="193" text-anchor="middle">Mac signals</text>
+  <text class="box-copy" x="145" y="219" text-anchor="middle">Process + memory</text>
+  <text class="box-copy" x="145" y="239" text-anchor="middle">Local native probes</text>
+
+  <path class="current-line" d="M235 208 H275"/>
+
+  <rect class="current-box" x="280" y="158" width="180" height="100" rx="10"/>
+  <text class="box-title" x="370" y="193" text-anchor="middle">Explicit sample</text>
+  <text class="box-copy" x="370" y="219" text-anchor="middle">stillmac sample</text>
+  <text class="box-copy" x="370" y="239" text-anchor="middle">No scheduler</text>
+
+  <path class="current-line" d="M460 208 H500"/>
+
+  <rect class="current-box" x="505" y="158" width="205" height="100" rx="10"/>
+  <text class="box-title" x="607.5" y="193" text-anchor="middle">Private history</text>
+  <text class="box-copy" x="607.5" y="219" text-anchor="middle">Validated + bounded</text>
+  <text class="box-copy" x="607.5" y="239" text-anchor="middle">Stored only on your Mac</text>
+
+  <path class="current-line" d="M710 208 H750"/>
+
+  <rect class="current-box" x="755" y="158" width="165" height="100" rx="10"/>
+  <text class="box-title" x="837.5" y="193" text-anchor="middle">Status</text>
+  <text class="box-copy" x="837.5" y="219" text-anchor="middle">Coverage progress</text>
+  <text class="box-copy" x="837.5" y="239" text-anchor="middle">Readiness gates</text>
+
+  <path class="current-line" d="M920 208 H960"/>
+
+  <rect class="current-box" x="965" y="158" width="180" height="100" rx="10"/>
+  <text class="box-title" x="1055" y="193" text-anchor="middle">Report</text>
+  <text class="box-copy" x="1055" y="219" text-anchor="middle">JSON or Markdown</text>
+  <text class="box-copy" x="1055" y="239" text-anchor="middle">Evidence view</text>
+
+  <rect class="gate" x="390" y="322" width="420" height="42" rx="21"/>
+  <text class="gate-copy" x="600" y="348" text-anchor="middle">SAFETY GATE · NOT ENABLED IN CURRENT BETA</text>
+
+  <rect class="row-future" x="30" y="382" width="1140" height="238" rx="14"/>
+  <text class="label-future" x="55" y="414">COMING SOON · APPROVAL-GATED</text>
+
+  <rect class="future-box" x="50" y="447" width="160" height="112" rx="10"/>
+  <text class="box-title" x="130" y="480" text-anchor="middle">Learn patterns</text>
+  <text class="box-copy" x="130" y="506" text-anchor="middle">Normal vs unusual</text>
+  <text class="box-copy" x="130" y="526" text-anchor="middle">Current-state check</text>
+
+  <path class="future-line" d="M210 503 H240"/>
+
+  <rect class="future-box" x="245" y="447" width="180" height="112" rx="10"/>
+  <text class="box-title" x="335" y="480" text-anchor="middle">Classify candidates</text>
+  <text class="box-copy" x="335" y="506" text-anchor="middle">Caches · stale worktrees</text>
+  <text class="box-copy" x="335" y="526" text-anchor="middle">Other reviewed files</text>
+
+  <path class="future-line" d="M425 503 H455"/>
+
+  <rect class="future-box" x="460" y="447" width="150" height="112" rx="10"/>
+  <text class="box-title" x="535" y="480" text-anchor="middle">Explain + preview</text>
+  <text class="box-copy" x="535" y="506" text-anchor="middle">Evidence</text>
+  <text class="box-copy" x="535" y="526" text-anchor="middle">Dry run</text>
+
+  <path class="future-line" d="M610 503 H640"/>
+
+  <rect class="future-box" x="645" y="447" width="150" height="112" rx="10"/>
+  <text class="box-title" x="720" y="480" text-anchor="middle">User approves</text>
+  <text class="box-copy" x="720" y="506" text-anchor="middle">Explicit consent</text>
+  <text class="box-copy" x="720" y="526" text-anchor="middle">Exact targets</text>
+
+  <path class="future-line" d="M795 503 H825"/>
+
+  <rect class="future-box" x="830" y="447" width="150" height="112" rx="10"/>
+  <text class="box-title" x="905" y="480" text-anchor="middle">Protect</text>
+  <text class="box-copy" x="905" y="506" text-anchor="middle">Quarantine</text>
+  <text class="box-copy" x="905" y="526" text-anchor="middle">Rollback controls</text>
+
+  <path class="future-line" d="M980 503 H1010"/>
+
+  <rect class="future-box" x="1015" y="447" width="135" height="112" rx="10"/>
+  <text class="box-title" x="1082.5" y="480" text-anchor="middle">Clean</text>
+  <text class="box-copy" x="1082.5" y="506" text-anchor="middle">Verify deletion</text>
+  <text class="box-copy" x="1082.5" y="526" text-anchor="middle">Action log</text>
+
+  <text class="subtitle" x="600" y="599" text-anchor="middle">Dashed blocks describe product direction—not current capability.</text>
+</svg>
