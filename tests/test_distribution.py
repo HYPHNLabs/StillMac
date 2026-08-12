@@ -52,10 +52,43 @@ class DistributionTests(unittest.TestCase):
   if archive: shutil.copy2(archive,assets/'stillmac-v0.1.0-darwin-arm64.tar.gz')
   if extra_manifest is not None: (assets/'SHA256SUMS').write_text(extra_manifest)
   home=p/'home'; home.mkdir(exist_ok=True); bindir=home/'.local'/'bin'; bindir.mkdir(parents=True,exist_ok=True); os.chmod(home,0o700); os.chmod(home/'.local',0o700); os.chmod(bindir,0o700); fb=fake_path(p,assets,uid=uid)
-  activated=p/'install.sh'; manifest_hash=sha(assets/'SHA256SUMS'); activated.write_text((SCRIPTS/'install.sh.tmpl').read_text().replace('@TRUSTED_MANIFEST_SHA256@',manifest_hash).replace('ROOT=$(CDPATH= cd -- "$(dirname "$0")" && pwd)\n. "$ROOT/lib.sh"','ROOT='+str(SCRIPTS)+'\n. "$ROOT/lib.sh"')); activated.chmod(0o755)
+  activated=p/'install.sh'; manifest_hash=sha(assets/'SHA256SUMS'); template=(SCRIPTS/'install.sh.tmpl').read_text().replace('@TRUSTED_MANIFEST_SHA256@',manifest_hash); template=template.replace("PATH='/usr/bin:/bin:/usr/sbin:/sbin'",f"PATH='{fb}:/usr/bin:/bin:/usr/sbin:/sbin'"); activated.write_text(template); activated.chmod(0o755)
   env=os.environ.copy(); env.pop('EUID', None); env.update(HOME=str(home),STILLMAC_DOWNLOAD_BASE='https://fake/release',ASSET_DIR=str(assets),PATH=str(fb)+':'+os.environ['PATH'])
   if mutate: mutate(p,bindir,assets)
   return run([str(activated)],env=env),bindir
+ def test_generated_installer_is_standalone(self):
+  with tempfile.TemporaryDirectory() as d:
+   r,b=self.installer(d)
+   self.assertEqual(r.returncode,0,r.stderr)
+   self.assertTrue((b/'stillmac').is_file())
+ def test_generated_installer_never_executes_adjacent_library(self):
+  with tempfile.TemporaryDirectory() as d:
+   marker=pathlib.Path(d)/'hostile-library-executed'
+   hostile=pathlib.Path(d)/'lib.sh'; hostile.write_text(f'#!/bin/sh\ntouch {marker}\nexit 97\n'); hostile.chmod(0o755)
+   r,b=self.installer(d)
+   self.assertEqual(r.returncode,0,r.stderr)
+   self.assertFalse(marker.exists())
+   self.assertTrue((b/'stillmac').is_file())
+ def test_installer_sets_trusted_system_path(self):
+  text=(SCRIPTS/'install.sh.tmpl').read_text()
+  self.assertIn("PATH='/usr/bin:/bin:/usr/sbin:/sbin'",text)
+  self.assertIn('export PATH',text)
+  self.assertNotIn('lib.sh',text)
+  self.assertNotIn('. "$ROOT/',text)
+ def test_generated_installer_ignores_hostile_inherited_path(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=pathlib.Path(d); assets=p/'assets'; assets.mkdir(); pkg(assets)
+   home=p/'home'; bindir=home/'.local'/'bin'; bindir.mkdir(parents=True)
+   for directory in (home,home/'.local',bindir): os.chmod(directory,0o700)
+   marker=p/'hostile-path-executed'; hostile=p/'hostile'; hostile.mkdir()
+   for command in ('uname','curl','shasum','awk','tar'):
+    shim=hostile/command; shim.write_text(f'#!/bin/sh\ntouch "{marker}"\nexit 99\n'); shim.chmod(0o755)
+   activated=p/'install.sh'; activated.write_text((SCRIPTS/'install.sh.tmpl').read_text().replace('@TRUSTED_MANIFEST_SHA256@',sha(assets/'SHA256SUMS'))); activated.chmod(0o755)
+   env=os.environ.copy(); env.update(HOME=str(home),STILLMAC_DOWNLOAD_BASE=assets.as_uri(),PATH=str(hostile)+':'+os.environ['PATH'])
+   r=run([str(activated)],env=env)
+   self.assertEqual(r.returncode,0,r.stderr)
+   self.assertFalse(marker.exists())
+   self.assertTrue((bindir/'stillmac').is_file())
  def test_installer_fresh_install(self):
   with tempfile.TemporaryDirectory() as d: r,b=self.installer(d); self.assertEqual(r.returncode,0,r.stderr); self.assertTrue((b/'stillmac').is_file())
  def test_installer_idempotent_update(self):
