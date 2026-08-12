@@ -177,11 +177,11 @@ class DistributionTests(unittest.TestCase):
   self.assertLess(brew,skill)
  def test_readme_separates_cleanup_vision_from_current_read_only_beta(self):
   text=(ROOT/'README.md').read_text()
-  diagram=(ROOT/'docs/assets/stillmac-workflow.svg').read_text()
   self.assertIn('StillMac learns what is normal on your Mac',text)
-  self.assertIn('docs/assets/stillmac-workflow.svg',text)
-  for label in ('CURRENT · READ-ONLY','COMING SOON · APPROVAL-GATED','Caches · stale worktrees','SAFETY GATE'):
-   self.assertIn(label,diagram)
+  for label in ('CURRENT — READ-ONLY','COMING SOON — APPROVAL-GATED','SAFETY GATE — CLEANUP IS NOT ENABLED IN THE CURRENT BETA','caches · stale worktrees','quarantine · rollback'):
+   self.assertIn(label,text)
+  self.assertNotIn('stillmac-workflow.svg',text)
+  self.assertFalse((ROOT/'docs/assets/stillmac-workflow.svg').exists())
   self.assertIn('not implemented in the current beta',text)
   self.assertLess(text.index('## How StillMac works'),text.index('## Release state'))
 if __name__=='__main__': unittest.main(verbosity=2)

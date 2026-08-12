@@ -10,7 +10,36 @@ StillMac learns what is normal on your Mac so future cleanup decisions can be ev
 
 ## How StillMac works
 
-![StillMac evidence-led cleanup workflow: current read-only capabilities and separately approval-gated future cleanup](docs/assets/stillmac-workflow.svg)
+```text
++============================================================================+
+|                       CURRENT — READ-ONLY                                  |
++============================================================================+
+|  +-------------+    +-------------+    +----------------+                  |
+|  | Mac signals | -> |   Explicit  | -> | Private history|                  |
+|  | process +   |    |    sample   |    | validated +    |                  |
+|  | memory      |    | no scheduler|    | bounded locally|                  |
+|  +-------------+    +-------------+    +--------+-------+                  |
+|                                                  |                         |
+|                                      +-----------+-----------+             |
+|                                      v                       v             |
+|                              +---------------+       +---------------+     |
+|                              |    Status     |       |    Report     |     |
+|                              | coverage view |       | evidence view |     |
+|                              +---------------+       +---------------+     |
++============================================================================+
+|          SAFETY GATE — CLEANUP IS NOT ENABLED IN THE CURRENT BETA          |
++============================================================================+
+|                    COMING SOON — APPROVAL-GATED                            |
++============================================================================+
+| +----------+  +-------------+  +-----------+  +---------+  +-------------+ |
+| |  Learn   |  |  Classify   |  | Explain + |  |  User   |  |  Protect +  | |
+| | patterns |->| candidates  |->|  dry run  |->| approves|->|    clean    | |
+| +----------+  +------+------+  +-----------+  +---------+  +------+------+ |
+|                   |                                              |         |
+|           caches · stale worktrees                    quarantine · rollback|
+|           other reviewed files                         verify · action log |
++============================================================================+
+```
 
 StillMac's objective is not blind cleanup. It is to learn recurring patterns first, distinguish active resources from credible stale candidates, and make any future deletion inspectable and user-approved. Cache inspection, worktree classification, recommendations, quarantine, and deletion are **not implemented in the current beta**.
 
