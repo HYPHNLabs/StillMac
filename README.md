@@ -4,9 +4,52 @@
 
 # StillMac
 
-StillMac is a local, deterministic, read-only process and memory baseline for macOS.
+StillMac learns what is normal on your Mac so future cleanup decisions can be evidence-led, explicit, and safe.
 
-> StillMac runs locally, sends no telemetry, uses no LLM, and cannot terminate processes, clean files, or change system configuration.
+> **Current beta:** a local, deterministic, read-only process and memory baseline. It runs locally, sends no telemetry, uses no LLM, and cannot terminate processes, clean files, or change system configuration.
+
+## How StillMac works
+
+```text
+AVAILABLE NOW — READ-ONLY
+
+  macOS process + memory signals
+                │
+                ▼
+       explicit `stillmac sample`
+                │
+                ▼
+       bounded private history
+                │
+          ┌─────┴─────┐
+          ▼           ▼
+       status       report
+    coverage view   evidence view
+
+────────────────────────────────────────────────────
+
+FUTURE — SEPARATELY DESIGNED, TESTED, AND APPROVED
+
+  learned patterns + current-state revalidation
+                │
+                ▼
+  classify cleanup candidates
+  (caches, stale worktrees, and other reviewed files)
+                │
+                ▼
+       explain evidence + dry run
+                │
+                ▼
+         explicit user approval
+                │
+                ▼
+       quarantine / rollback controls
+                │
+                ▼
+          verified deletion + action log
+```
+
+StillMac's objective is not blind cleanup. It is to learn recurring patterns first, distinguish active resources from credible stale candidates, and make any future deletion inspectable and user-approved. Cache inspection, worktree classification, recommendations, quarantine, and deletion are **not implemented in the current beta**.
 
 ## Release state
 

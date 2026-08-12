@@ -175,4 +175,12 @@ class DistributionTests(unittest.TestCase):
   brew=text.index('```bash\nbrew install HYPHNLabs/tap/stillmac\n```')
   skill=text.index('```bash\nnpx skills add HYPHNLabs/StillMac -g\n```')
   self.assertLess(brew,skill)
+ def test_readme_separates_cleanup_vision_from_current_read_only_beta(self):
+  text=(ROOT/'README.md').read_text()
+  self.assertIn('StillMac learns what is normal on your Mac',text)
+  self.assertIn('AVAILABLE NOW — READ-ONLY',text)
+  self.assertIn('FUTURE — SEPARATELY DESIGNED, TESTED, AND APPROVED',text)
+  self.assertIn('caches, stale worktrees, and other reviewed files',text)
+  self.assertIn('not implemented in the current beta',text)
+  self.assertLess(text.index('## How StillMac works'),text.index('## Release state'))
 if __name__=='__main__': unittest.main(verbosity=2)
