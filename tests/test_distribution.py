@@ -171,4 +171,8 @@ class DistributionTests(unittest.TestCase):
   self.assertIn('brew install HYPHNLabs/tap/stillmac',text)
   self.assertIn('npx skills add HYPHNLabs/StillMac -g',text)
   self.assertIn('**neither is active yet**',text)
+  self.assertLess(text.index('## One-line installation routes'),text.index('## Quick start'))
+  brew=text.index('```bash\nbrew install HYPHNLabs/tap/stillmac\n```')
+  skill=text.index('```bash\nnpx skills add HYPHNLabs/StillMac -g\n```')
+  self.assertLess(brew,skill)
 if __name__=='__main__': unittest.main(verbosity=2)
