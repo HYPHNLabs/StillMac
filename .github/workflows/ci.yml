@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Verify formatting
+        run: test -z "$(gofmt -l .)"
+      - name: Test with race detector
+        run: go test -count=1 -race ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Build current runner
+        run: go build -trimpath -o /tmp/stillmac ./cmd/stillmac
+      - name: Cross-build Darwin targets
+        run: |
+          GOOS=darwin GOARCH=arm64 go build -trimpath -o /tmp/stillmac-darwin-arm64 ./cmd/stillmac
+          GOOS=darwin GOARCH=amd64 go build -trimpath -o /tmp/stillmac-darwin-amd64 ./cmd/stillmac
+      - name: Reject runner workspace paths in binaries
+        run: |
+          for artifact in /tmp/stillmac /tmp/stillmac-darwin-arm64 /tmp/stillmac-darwin-amd64; do
+            if strings "$artifact" | grep -F "$GITHUB_WORKSPACE"; then
+              echo "build path leaked into $artifact" >&2
+              exit 1
+            fi
+          done
+      - name: Distribution tests and shell checks
+        run: |
+          python3 -m unittest -v tests/test_distribution.py
+          python3 -m unittest -v tests/test_public_residue.py
+          sh -n scripts/*.sh scripts/install.sh.tmpl
+      - name: Reproducible packages and formula validation
+        run: |
+          d1=$(mktemp -d); d2=$(mktemp -d)
+          sh scripts/package.sh v0.1.0 "$d1"
+          sh scripts/package.sh v0.1.0 "$d2"
+          cmp "$d1/SHA256SUMS" "$d2/SHA256SUMS"
+          cmp "$d1/stillmac-v0.1.0-darwin-arm64.tar.gz" "$d2/stillmac-v0.1.0-darwin-arm64.tar.gz"
+          cmp "$d1/stillmac-v0.1.0-darwin-amd64.tar.gz" "$d2/stillmac-v0.1.0-darwin-amd64.tar.gz"
+          sh scripts/update-formula.sh v0.1.0 "$d1" /tmp/stillmac.rb
+          ruby -c /tmp/stillmac.rb
+          (cd "$d1" && shasum -a 256 -c SHA256SUMS)

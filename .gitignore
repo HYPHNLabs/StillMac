@@ -1,0 +1,33 @@
+# Private planning documents
+/HYPHN-Labs-Open-Source-Programme-PRD.md
+/PRD*.md
+/TASK*.md
+
+# Go build/test output
+/bin/
+*.test
+*.out
+/coverage/
+
+# Local runtime and release-test state
+/runtime-data/
+/.stillmac-data/
+/dist/
+
+# Local-only generated brand variants; the approved matte app icon and logo
+# are explicitly re-included below.
+/assets/brand/*.png
+!/assets/brand/stillmac-app-icon-matte-1024.png
+!/assets/brand/stillmac-logo-matte-dark.png
+
+# macOS, editor, and local environment
+.DS_Store
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+
+# Temporary files
+*.tmp
+*.swp

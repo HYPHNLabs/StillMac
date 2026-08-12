@@ -1,0 +1,21 @@
+{
+  "product": "StillMac",
+  "generated_at": "2026-08-12",
+  "generator": "OpenAI ImageGen",
+  "assets": [
+    {
+      "file": "stillmac-app-icon-matte-1024.png",
+      "width": 1024,
+      "height": 1024,
+      "colour_mode": "RGB",
+      "sha256": "d8cfd0049606236b40dbfc5ff168984b05b571268b6de59ed6bdbf5f0d898827"
+    },
+    {
+      "file": "stillmac-logo-matte-dark.png",
+      "width": 2172,
+      "height": 724,
+      "colour_mode": "RGB",
+      "sha256": "0f4b3604304f592619fff9fdc829728cb53b34a00cf012b6272bcc7e3c9f819b"
+    }
+  ]
+}
