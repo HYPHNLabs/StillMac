@@ -1,72 +1,64 @@
-# Threat Model
+# Threat model
 
 ## Scope
 
-This threat model covers the current StillMac read-only CLI: `doctor`, `sample`, `status`, and `report`.
-
-Excluded runtime surfaces remain scheduler, network access, cache/port inspection, recommendations, and active remediation. Distribution scripts, uninstaller, and a thin Agent Skill now exist as separately reviewed public surfaces; remote activation is not present.
+This model covers baseline commands and the developer cleanup commands `scan`, `explain`, `plan`, `apply`, `clean`, `protect`, and `history`. Distribution remains inactive.
 
 ## Protected assets
 
-- command arguments, environment variables, credentials, and private paths;
-- browser, workspace, agent, and personal file contents;
-- integrity and confidentiality of StillMac-owned local observations;
-- the last known valid observation history;
-- accurate representation of confidence, coverage, and causation limits.
+- command arguments, credentials, private paths, workspace identities, and unrelated filenames;
+- integrity of baseline history, plans, target registries, protection records, and receipts;
+- exact cache roots and all unrelated user data;
+- truthful decisions, action results, and reclaimed-space claims.
 
 ## Trust boundaries
 
-1. macOS native output enters the collector and is untrusted.
-2. User-selected storage paths and existing filesystem objects are untrusted.
-3. Stored JSON is untrusted on every read, even if StillMac previously wrote it.
-4. Standard-output consumers are outside StillMac's control.
-5. Build and future distribution infrastructure are not part of the current runtime.
+Native command output, selected HOME/scope/data paths, filesystem objects, persisted JSON, confirmation input, and output consumers are untrusted. The user account and kernel are trusted. Malicious concurrent same-UID replacement of the Go executable pathname or the logical GOCACHE root is explicitly out of scope and remains residual risk; no userspace check can atomically bind either pathname to `execve` or Go's subsequent pathname resolution.
 
-## Principal threats and controls
+## Threats and controls
 
-### Sensitive native output leakage
+### Path disclosure
 
-**Threat:** command output contains paths, arguments, or credential-shaped data.
+Git and cache paths could expose usernames or projects. Public candidates use opaque stable IDs and generic labels. Absolute targets and the actual host ID exist only in a `0600` target registry. Errors are generic and path-free.
 
-**Controls:** fixed native command forms, allowlisted parsing, basename sanitisation, in-memory discard, fixed path-free errors, hostile-fixture tests.
+### Plan or target substitution
 
-### State-path substitution
+A plan could be edited to point at arbitrary data. The plan hash binds complete public content and a target-registry hash. The private registry binds actual host, exact path, family, rule, root kind, decision, fingerprint, device, and inode. Unknown schemas, IDs, entries, or fields fail closed.
 
-**Threat:** symlinks or non-regular files redirect reads, writes, permission changes, or pruning.
+### Time-of-check to time-of-use change
 
-**Controls:** no-follow directory/file opens where available, descriptor-based permission repair, regular-file checks, identity rechecks, and fail-closed handling of unknown entries.
+A cache, parent, protection state, rule, decision, cache fingerprint, or Go executable binding could change after planning. Apply revalidates them immediately before the owner-native action, reducing accidental or stale changes. These checks are not atomic with `execve` or Go's pathname resolution and do not defend against a hostile same-UID race. Replacement with identical content still fails inode identity when observed by the checks. A difference yields a `blocked_changed` receipt and state exit.
 
-### Corrupt or adversarial state
+### Symlink and filesystem redirection
 
-**Threat:** malformed, oversized, duplicated, backdated, or unknown JSON causes unsafe behaviour or unbounded work.
+Selected state or target parents could redirect inspection. StillMac rejects symlinked nearest state parents, unsafe state objects and modes, target parents below HOME that are links or non-directories, non-directory roots, and target identity changes. Apply passes no target path argument to Go.
 
-**Controls:** strict schemas, required-member checks, unknown/trailing-value rejection, canonical timestamps, exact duplicate rejection, bounded directory enumeration, count/age/file/total-size limits, and non-mutating read failures.
+### Over-broad action
 
-### Partial storage failure
+An inventory rule could become an executable action. Only verified Go build cache rows can map to `owner-native-go-clean-cache`. Homebrew, Git, and Codex actions are `none`. There is no shell, recursive removal, force flag, raw plan path execution, arbitrary target, or cache-root rename.
 
-**Threat:** an interrupted append or prune destroys prior valid history or reports false success.
+### False free-space claim
 
-**Controls:** private temporary files, fsync, atomic no-replace publication, explicit rollback, injected failure tests, generic failure exits, and preservation of validated prior state.
+The same exact scanner measures the Go cache before and after a successful owner action. Receipts set `moved_bytes` to zero and report both `removed_bytes` and `reclaimed_bytes` as `max(before-after, 0)`. Command failure claims neither, even if Go partially changed its cache.
 
-### Misinterpretation of observations
+### Accidental approval
 
-**Threat:** users infer causation, high confidence, or permission to act.
+Non-TTY `clean` refuses. Interactive clean prints every candidate and exclusion, creates the exact plan, and accepts only `apply PLAN_ID`. Scripted use must separate plan review from apply.
 
-**Controls:** reports remain preliminary and low confidence; process and memory measurements are described only as temporally associated; `recommendations_enabled` is always false; coverage readiness does not authorise action.
+### Partial apply or output failure
 
-### Supply-chain risk
+Each attempted row gets an atomic receipt with success or failure. Apply returns structured rows and a failure exit when any row fails. Output writer failure is distinct. History remains the source of truth for the measured result.
 
-**Threat:** an unverified build or future installer is treated as a trusted release.
+### Supply chain
 
-**Controls today:** reproducible builds, checksums, archive type validation, staged doctor, rollback tests, clean-account fixtures, and a fail-closed source installer. A release-generated installer must embed a reviewed manifest digest and verify it before parsing archive hashes; the Go binary remains no-network. Remote release activation, provenance, and owner/licence approval remain required.
+The source installer fails closed. Curl, Homebrew, and npx routes are inactive. Local packaging tests do not establish a public release, signing, notarisation, provenance, or compatibility.
 
 ## Residual risks
 
-- Process labels are lossy and can collide; PIDs can be reused.
-- Local administrators and malware with equivalent user access can read or alter local state despite file modes.
-- The current host evidence does not prove compatibility with every target macOS version or Intel hardware.
-- Standard output can be redirected or shared by callers outside StillMac's control.
+- Equivalent-user malware can read or mutate local state and cache data.
+- Malicious same-UID concurrent replacement of the Go executable or logical GOCACHE pathname is out of scope and can race the final checks, `execve`, or Go pathname resolution. Fixed absolute executable selection, fingerprints, exact GOCACHE, fixed arguments, and sanitized environment are defense-in-depth, not an atomic guarantee. No cache source-name rename remains.
+- Go cache cleaning can increase the cost of later builds while cache entries are rebuilt.
+- Git reachability is evaluated against local `main`; stale refs can make inventory conservative or incomplete.
+- macOS 14 and Intel runtime support are not verified.
 
-## Future-change rule
-
-Any mutation, scheduler, network, cache, port, or policy feature expands this model and must be reviewed before implementation or release. The installer, uninstaller, and thin Agent Skill are documented distribution surfaces; no scheduler or remote activation exists.
+Future end-session automation may scan only. Auto-clean, scheduler state, new roots, or network behaviour requires a new contract and threat review.

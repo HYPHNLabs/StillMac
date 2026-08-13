@@ -1,9 +1,12 @@
 # Uninstall
 
-Inspect the paths before acting. The beta operation removes only a regular `stillmac` binary and keeps all data:
+Inspect the script and paths first:
 
 ```sh
+less scripts/uninstall.sh
 sh scripts/uninstall.sh
 ```
 
-The beta script deliberately has no automated recursive data purge: safe descriptor-relative deletion is not implemented, so a check-then-remove race would be unsafe. To remove data, inspect first, then delete only the reviewed path with your normal filesystem tools; do not follow symlinks and do not use a broad wildcard. Custom data paths require the same inspect-first review. No scheduler, unrelated file, or user data outside the selected path is touched.
+The script removes only a regular installed `~/.local/bin/stillmac` binary. It refuses unsafe options and symlinks. It keeps all baseline state, cleanup plans, receipts, and protections.
+
+Removing retained state is outside the cleanup contract. If it must be removed, inspect the exact selected data directory and use a separately reviewed process. Do not use a broad wildcard, recursive command copied from an agent, or a path you did not resolve yourself.

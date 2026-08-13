@@ -2,7 +2,7 @@
 
 ## Product boundary
 
-StillMac v0.1 is a local, deterministic, read-only process and memory baseline for macOS.
+StillMac v0.1 is a local, deterministic process and memory baseline plus an approval-gated developer-cache cleanup slice for macOS.
 
 The current beta candidate contains only:
 
@@ -12,15 +12,18 @@ The current beta candidate contains only:
 - deterministic coverage status;
 - preliminary JSON and Markdown reports;
 - explicit data-quality and confidence output.
+- exact-root Homebrew and Go cache inventory, immutable plans, protection, and receipts;
+- path-free Git worktree inventory with no Git cleanup action;
+- non-executable Codex runtime inventory.
 
-Do not add a scheduler, installer, updater, uninstaller, Agent Skill, client adapter, cache collection, standalone port analysis, process termination, cleanup, telemetry, cloud service, networking, or LLM dependency without a separately approved contract.
+Do not broaden cleanup beyond `docs/DEVELOPER-CLEANUP-CONTRACT.md`. Do not add a scheduler, runtime installer/updater, client adapter, standalone port analysis, process termination, arbitrary deletion, cache-root rename, telemetry, cloud service, networking, or LLM dependency without a separately approved contract.
 
 ## Privacy and safety
 
 - Collect only explicitly allowlisted fields.
 - Never collect command arguments, environment variables, full executable paths, workspace paths/names, usernames, unrelated filenames, file contents, clipboard, browser data, agent conversations, tokens, or credentials.
 - Report temporal association only. Never claim a process caused memory pressure.
-- The binary must have no active-action capability in v0.1.
+- The only active action is approval-gated invocation of a verified owner-native Go tool as absolute `go clean -cache` for the exact Go build cache.
 - Store data locally with restrictive permissions and fail closed on unsafe state.
 
 ## Engineering

@@ -2,59 +2,26 @@
 
 ## Summary
 
-The StillMac Go binary operates locally and has no network client, telemetry, analytics, cloud service, or LLM dependency. The separately distributed installer uses the network only to fetch a versioned release asset and its checksum manifest; it does not send observation data. StillMac collects only a narrow allowlist needed for a process-and-memory observation.
+The StillMac Go binary is local and has no network client, telemetry, analytics, cloud service, or LLM dependency. The inactive release installer template is a separate distribution surface. Cleanup inventory and state are path-minimised and private.
 
-## Collected fields
+## Process and memory observations
 
-Each process observation may contain:
+The baseline may store sanitised process basename, PID, PPID, CPU percentage, memory percentage, elapsed seconds, UTC capture time, macOS memory-pressure category, swap used bytes, and fixed data-quality fields. It never stores command lines, arguments, environment variables, full executable paths, workspace names, usernames, unrelated filenames, contents, browser data, agent conversations, tokens, or credentials.
 
-- sanitised executable/accounting basename (`comm`);
-- process ID and parent process ID at collection time;
-- CPU percentage;
-- memory percentage;
-- elapsed process time in seconds.
+## Cleanup public output
 
-Each host observation may contain:
+Candidate and plan JSON may contain stable opaque IDs, family, versioned rule, measured bytes, decision, fixed reasons, action, reversibility, UTC capture time, generic label, tree fingerprint, current state, and root kind. Git worktree labels are numbered and path-free.
 
-- UTC capture timestamp;
-- macOS memory-pressure category: `normal`, `warning`, or `critical`;
-- swap used in bytes;
-- aggregate data-quality counts and fixed issue codes.
+Public JSON and receipts exclude absolute HOME and project paths, usernames, command arguments, cache filenames, and Git filenames. A tree fingerprint binds private structure without disclosing it.
 
-## Never collected
+## Cleanup private state
 
-StillMac does not collect or retain:
+The private target registry contains the actual host ID, exact allowlisted Go cache path, and trusted Go executable identity and configuration because apply cannot safely act without them. Protection records, plans, target registries, and receipts remain under the selected StillMac data directory. Directories use `0700`; regular JSON uses `0600`. Unsafe links, objects, permissions, and unknown entries fail closed.
 
-- command lines or arguments;
-- environment variables;
-- full executable or workspace paths;
-- usernames;
-- unrelated filenames or file contents;
-- clipboard or browser data;
-- cookies, profiles, sessions, or browsing history;
-- agent conversations or chat content;
-- tokens, API keys, passwords, or credentials;
-- cache contents or port data;
-- device identifiers or analytics identifiers.
+StillMac does not store a copy of cache contents. The verified Go tool owns cache cleaning. Public output reports only measured aggregate bytes and never cache filenames or contents.
 
-Native command output is parsed in memory and discarded. Native errors are not copied into stored state or user-visible errors.
+## Storage and sharing
 
-## Storage and retention
+The default directory is `$HOME/Library/Application Support/StillMac`; `--data-dir` selects another. Reports go to standard output. StillMac transmits nothing. Callers control later sharing.
 
-The default data directory is:
-
-```text
-$HOME/Library/Application Support/StillMac
-```
-
-A caller may select another directory with `--data-dir`. StillMac uses private directory/file permissions where practical and rejects unsafe symbolic-link or non-regular storage objects.
-
-Immutable history is bounded to the newest 672 samples, a maximum age of 14 days relative to the newest valid sample, 2 MiB per history sample, and 128 MiB total encoded history. Retention is enforced only during accepted storage operations.
-
-## Sharing
-
-Reports are emitted to standard output. StillMac does not transmit them. The user or calling tool controls any later copying or sharing.
-
-## Verification
-
-Privacy behaviour is enforced through hostile synthetic fixtures, strict schemas, unknown-field rejection, path-free errors, storage permission tests, and binary/state/report scans. See [docs/V0.1-TRACER-CONTRACT.md](docs/V0.1-TRACER-CONTRACT.md) for the normative contract.
+Baseline sample retention remains bounded to 672 samples, 14 days relative to the newest valid sample, 2 MiB per sample, and 128 MiB total. Cleanup plans expire after 15 minutes. There is no scheduler.

@@ -1,40 +1,40 @@
 ---
 name: stillmac
-description: Use StillMac for explicit, local, read-only macOS baseline observations.
+description: Use StillMac for explicit local macOS baseline observation and approval-gated owner-native Go build cache cleaning.
 metadata:
   hermes:
-    tags: [macos, diagnostics, privacy]
+    tags: [macos, diagnostics, privacy, cleanup]
 ---
 
 # StillMac
 
-## When to use
-Use the installed `stillmac` CLI when the user explicitly wants a local, read-only macOS process/memory baseline. Use the repository's `scripts/install.sh` only after inspect-first review.
+## Boundary
 
-## Do not use
-Do not use for scheduling, remediation, process termination, cache/port inspection, networking, telemetry, causation claims, or automatic collection. Never invent collector logic or host-specific absolute paths.
+Use the installed `stillmac` binary. Never invent paths, candidate IDs, plan IDs, cache rules, shell deletion commands, Git cleanup commands, or host facts. Do not interpret `SAFE` as permission. Only a verified Go build cache row can be executable. Homebrew, Codex, and Git rows are inventory only.
 
-## Prerequisites and consent
-StillMac v0.1 targets macOS 14+ and requires a supported release binary or Go 1.23+ source build. Before `sample`, explain the allowlisted fields and obtain explicit consent for each collection run. Collection writes only the selected local data directory.
+Public installation routes are inactive. Do not tell the user that curl, Homebrew, npx, a release, signing, notarisation, or Intel support works.
 
-## Install (inspect first)
-Review `docs/DISTRIBUTION-CONTRACT.md`, `INSTALL.md`, and the fail-closed `scripts/install.sh`. The remote release, npx skill activation, and Homebrew tap are unavailable until a versioned release and tap exist. When activated, use the release-generated installer: it verifies its embedded trusted manifest digest before validating the matching archive checksum and contents, runs staged `doctor`, then atomically installs without sudo.
+## Conversational cleanup flow
 
-## Doctor and use
-```sh
-stillmac doctor --data-dir "$DIR"
-# after explicit consent:
-stillmac sample --data-dir "$DIR"
-stillmac status --data-dir "$DIR"
-stillmac report --format markdown --data-dir "$DIR"
-stillmac report --format json --data-dir "$DIR"
-```
+Follow these steps in order:
 
-## Update
-Inspect the new release manifest and run the same installer. Updates are checksum-verified, doctor-gated, and preserve the prior binary if staging fails.
+1. **Scan** with `stillmac scan --format json`, adding `--scope PATH` only when the user supplied that project path.
+2. **List** every candidate with its current display number, stable ID, label, bytes, decision, and reason. Include blocked, review, and protected rows.
+3. **Choice**: ask the user to select current `SAFE` IDs or `all-safe`. A human-controlled `clean` TTY may use fresh display numbers, but agent planning must use stable IDs. Do not choose silently or mix `all-safe` with explicit selections.
+4. **Plan** with the exact selected IDs, same scope, and selected data directory. Show included and excluded rows, expiry, and plan ID.
+5. **Approval**: require the user to approve that exact plan. Explain that approval authorizes `go clean -cache` against the logical exact GOCACHE pathname, receipts report measured non-negative reclaimed bytes, later Go builds may need to rebuild cache entries, and malicious concurrent same-UID pathname replacement is outside the protection boundary.
+6. **Apply** with `stillmac apply PLAN_ID`. Report every receipt row, including partial failures. Do not retry a `BLOCKED_CHANGED` row without a new scan and plan.
 
-## Uninstall
-Run `scripts/uninstall.sh` or the documented installed equivalent. Uninstall removes only the regular binary and keeps data. Beta never automates recursive data purge because safe descriptor-relative deletion is not implemented; inspect the exact path first and manually remove only reviewed data, refusing symlinks and non-regular objects.
+`stillmac clean` may be offered only for a human-controlled TTY. It prints the same full list and accepts only `apply PLAN_ID`. For automation, always use separate plan and apply steps.
 
-## Safety and verification
-Verify paths, checksums, archive members, exit status, and that real user data and scheduler state were untouched. StillMac is read-only/no-network/no-scheduler. Seven-day status gates are elapsed span, distinct UTC dates, and 84 intervals; they are not an approval or causation claim.
+## Protection and history
+
+Use `stillmac protect ID` only for an ID from the same current scan. Use `stillmac history --format json` to inspect prior receipts. Protection must remain visible in future lists and blocks both planning and apply.
+
+## Baseline flow
+
+Before each `sample`, explain the allowlisted process and memory fields and obtain explicit consent. Then use `doctor`, `sample`, `status`, and `report`. These observations establish temporal association only, never process causation.
+
+## Automation
+
+There is no scheduler. Any future end-session automation is scan-only. Never auto-clean, auto-plan, auto-approve, or generate shell removal commands.
