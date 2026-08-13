@@ -96,6 +96,19 @@ func TestCleanupCLIParsesMultipleIDsOptionsAndScope(t *testing.T) {
 	}
 }
 
+func TestScanCLIJSONUsesEmptyArrayWhenThereAreNoCandidates(t *testing.T) {
+	deps, _, _ := cleanupDeps(t, false, "")
+	emptyHome := t.TempDir()
+	deps.CleanupHome = func() (string, error) { return emptyHome, nil }
+	code, out, stderr := runCleanup(t, []string{"scan", "--format", "json"}, deps)
+	if code != cli.ExitOK || stderr != "" {
+		t.Fatalf("scan code=%d stderr=%q", code, stderr)
+	}
+	if strings.TrimSpace(out) != "[]" {
+		t.Fatalf("scan JSON = %q, want []", out)
+	}
+}
+
 func TestExplainApplyHistoryTextAndJSON(t *testing.T) {
 	deps, _, data := cleanupDeps(t, false, "")
 	_, scanJSON, _ := runCleanup(t, []string{"scan", "--format", "json"}, deps)

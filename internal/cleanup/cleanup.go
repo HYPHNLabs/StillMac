@@ -243,7 +243,7 @@ func ScanWithConfig(c ScanConfig) ([]Candidate, error) {
 	if protected == nil {
 		protected = map[string]string{}
 	}
-	var out []Candidate
+	out := make([]Candidate, 0)
 	for _, rule := range cacheRules {
 		root := filepath.Join(home, filepath.FromSlash(rule.rel))
 		item, err := inspectCache(home, root, rule, c.Now, c.CodexInactive, c.GoCleaner)

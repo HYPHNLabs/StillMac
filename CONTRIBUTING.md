@@ -25,7 +25,7 @@ StillMac is a narrow baseline and approval-gated developer-cache beta candidate.
 gofmt -w .
 go test -count=1 -race ./...
 go vet ./...
-go build -trimpath -o ./bin/stillmac ./cmd/stillmac
+go build -buildvcs=false -trimpath -o ./bin/stillmac ./cmd/stillmac
 ```
 
 Inspect source, generated state/reports, and the binary for private paths, credentials, and unsupported claims. Synthetic hostile fixtures are expected; real secrets and personal data are prohibited.

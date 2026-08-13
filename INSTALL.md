@@ -42,7 +42,7 @@ The only current working route is a reviewed local source build:
 
 ```sh
 mkdir -p ./bin
-go build -trimpath -o ./bin/stillmac ./cmd/stillmac
+go build -buildvcs=false -trimpath -o ./bin/stillmac ./cmd/stillmac
 ./bin/stillmac help
 ./bin/stillmac scan --format text
 ```

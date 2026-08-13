@@ -25,6 +25,7 @@ This repository may be prepared and committed locally. No remote, push, tag, rel
 - [ ] Security disclosure route is operational.
 - [ ] Claimed macOS/architecture matrix executed in CI or on real hosts.
 - [ ] Tagged artifacts, SHA-256 manifest, and provenance generated and verified.
+- [ ] For a private release rehearsal only: build with `-buildvcs=false -trimpath`, package, then run `scripts/activate-installer.sh` after reviewing the exact manifest; this does not publish or activate checked-in scripts.
 - [x] Local clean-account installer/uninstaller fixtures and rollback behavior are tested; remote release activation remains pending.
 - [ ] README claims match executed evidence.
 - [ ] Explicit public publication approval recorded.

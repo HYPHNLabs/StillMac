@@ -63,7 +63,7 @@ Build the current source candidate:
 
 ```bash
 mkdir -p ./bin
-go build -trimpath -o ./bin/stillmac ./cmd/stillmac
+go build -buildvcs=false -trimpath -o ./bin/stillmac ./cmd/stillmac
 ```
 
 Read-only baseline commands remain available:
@@ -154,7 +154,7 @@ The uninstaller removes only the regular installed binary and keeps baseline and
 gofmt -w .
 go test -count=1 -race ./...
 go vet ./...
-go build -trimpath -o ./bin/stillmac ./cmd/stillmac
+go build -buildvcs=false -trimpath -o ./bin/stillmac ./cmd/stillmac
 python3 -m unittest discover -s tests -v
 sh -n scripts/*.sh scripts/install.sh.tmpl
 git diff --check
