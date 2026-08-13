@@ -1,68 +1,33 @@
 # Architecture
 
-## Overview
-
-StillMac is a single local Go CLI with no third-party dependencies. The current data flow is:
+StillMac is one standard-library Go CLI with two bounded verticals.
 
 ```text
-macOS native probes
-        ↓
-allowlisted parsers and validators
-        ↓
-validated immutable local history
-        ↓
-baseline status or preliminary report
+fixed process and memory probes -> allowlisted observation -> private samples -> status/report
+
+exact cache and Git scan -> path-free candidates -> immutable plan + private targets
+                                                    -> revalidation -> owner-native Go action + receipt
 ```
 
 ## Packages
 
-- `cmd/stillmac` — process entry point and stable exit behaviour.
-- `internal/cli` — command parsing, command orchestration, output, and generic errors.
-- `internal/doctor` — deterministic host and data-directory readiness checks.
-- `internal/observe` — native process/memory collection and allowlisted parsing.
-- `internal/state` — strict JSON validation, private storage, immutable history, bounds, and rollback.
-- `internal/baseline` — pure seven-day coverage calculations from validated samples.
-- `internal/report` — preliminary JSON and Markdown rendering.
+- `cmd/stillmac`: process entry and exit status.
+- `internal/cli`: parsing, text/JSON output, TTY confirmation, and injected dependencies.
+- `internal/observe`, `state`, `baseline`, `report`, `doctor`: existing baseline behaviour.
+- `internal/cleanup`: exact-root rules, Git inventory, fingerprints, plans, protection, private state, apply, and history.
 
-## Command flow
+## Cleanup dependency boundary
 
-### `doctor`
+`cli.Dependencies` can inject clock, HOME, host ID, stdin, TTY status, Git runner, Go cleaner, and a cleanup service factory. Production defaults use the real user HOME, hostname, clock, stdin, terminal mode, fixed Git executable, and verified owner-native Go tool discovery.
 
-Validates macOS, fixed native probes, and the selected data directory. It may create the selected directory and a temporary private write probe; it changes no system configuration.
+The scanner emits no target path. Planning reconstructs targets only from built-in family rules and stores them in a private registry. The public plan binds the registry hash. Apply never trusts a public path or derives scope from the data directory.
 
-### `sample`
+## Action boundary
 
-Collects process and memory measurements sequentially, validates the sample, and appends an immutable private history file. It emits only a small aggregate result.
+Only `go-build-cache.v1` can map to `owner-native-go-clean-cache`. Homebrew, Codex, and Git always map to `none`. Apply validates the exact rule, root identity, private executable binding, fixed arguments, and sanitized environment, then invokes the absolute Go executable without a shell. These checks are defense-in-depth and not atomic with `execve` or Go pathname resolution; same-UID hostile concurrent replacement is out of scope. No cache filesystem rename or removal primitive exists in the cleanup package; its sole `os.Rename` publishes private JSON state atomically.
 
-### `status`
+## Storage
 
-Reads and validates all bounded history, sorts by parsed capture time, and computes elapsed span, distinct UTC dates, distinct 30-minute intervals, largest gap, quality counts, and stable blockers.
+Baseline history remains under `samples/`. Cleanup state is isolated under `cleanup/` with `plans`, `targets`, `protected`, and `receipts`. JSON publication uses private temporary files, sync, close, and atomic rename.
 
-### `report`
-
-Selects the latest validated sample and emits a preliminary low-confidence report. It does not perform trend inference or causal attribution.
-
-## Storage model
-
-New observations are immutable files under `samples/`. An older `current-sample.json` may be read for compatibility but is no longer created by current sampling. The store validates every entry before read, append, or eligible retention pruning.
-
-Bounds:
-
-- 672 newest history samples;
-- 14 days relative to the newest valid sample;
-- 2 MiB per history sample;
-- 128 MiB total encoded history.
-
-## Design constraints
-
-- Local and deterministic.
-- Standard library only.
-- No scheduler or long-running process.
-- No network or telemetry.
-- Distribution scripts are outside the Go runtime: the installer fetches a versioned release asset and manifest, while the binary remains no-network.
-- No scheduler; the Agent Skill is a thin invocation layer over the same core.
-- No LLM dependency.
-- No host mutation or general cleanup.
-- Fixed errors never reveal rejected values or paths.
-
-The normative behaviour is [V0.1-TRACER-CONTRACT.md](V0.1-TRACER-CONTRACT.md). This document is explanatory; the contract and tests take precedence.
+The tracer contract and cleanup contract are normative. Distribution scripts remain outside the Go runtime.

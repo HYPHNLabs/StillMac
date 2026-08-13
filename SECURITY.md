@@ -1,35 +1,23 @@
-# Security Policy
+# Security policy
 
 ## Supported versions
 
-StillMac has not published a supported release. The current repository state is a pre-release beta candidate and may change without compatibility guarantees.
+StillMac has no published supported release. The repository is a pre-release candidate.
 
-## Reporting a vulnerability
+## Reporting
 
-Do not disclose a suspected vulnerability in a public issue.
+Do not put a vulnerability or real private data in a public issue. If GitHub Private Vulnerability Reporting becomes available, use it. Otherwise contact the repository owner through an owner-controlled private route. Include the affected command and revision, preconditions, impact, and a synthetic reproduction.
 
-When this repository is hosted on GitHub, use GitHub Private Vulnerability Reporting if it is enabled. If it is not available, contact the repository owner through an owner-controlled private channel and include:
+## Runtime boundary
 
-- affected command and revision;
-- impact and required preconditions;
-- minimal reproduction steps;
-- whether local private data may be exposed or modified;
-- any suggested mitigation.
+The binary reads fixed process and memory probes, reads exact cache metadata and Git worktree state, writes private StillMac state, and can perform one active action: approval-gated invocation of a verified absolute Go executable as `go clean -cache` for the exact allowlisted Go build cache.
 
-Do not include real credentials, private files, or unrelated user data in a report.
+It has no direct recursive-deletion or cache-root-rename primitive. It cannot execute arbitrary plan paths, force Git operations, act on Homebrew, Codex, or Git inventory, terminate processes, schedule itself, elevate privileges, send telemetry, or use a network client. The verified Go tool owns deletion inside its exact configured build cache.
 
-## Security boundary
+Security invariants include strict path-free public schemas, immutable hash-addressed 15-minute plans, a private integrity-bound target registry, actual host binding, protection enforcement, exact root device and inode identity, complete cache and executable fingerprint revalidation, sanitized Go configuration, fixed owner-native arguments, private atomic receipts, and fail-closed history reads. These checks reduce accidental or stale changes but are not atomic with `execve` or Go pathname resolution.
 
-The Go binary is read-only with respect to the host system. It can read allowlisted process and memory measurements and write only to its selected StillMac data directory. It contains no network, telemetry, cleanup, process-control, arbitrary-command, scheduler, updater, or elevated-privilege capability. Separately reviewed distribution surfaces include a fail-closed source installer, a release-generated installer template that pins a reviewed manifest digest before archive validation, a keep-data uninstaller, and a thin Agent Skill; remote release activation is not present.
+StillMac has no cache filesystem mutation primitive. Homebrew, Codex, and Git actions are `none`. Successful Go cleanup reports only the non-negative byte reduction measured by the exact scanner.
 
-Security-sensitive invariants include:
+See [THREAT-MODEL.md](THREAT-MODEL.md) and [docs/DEVELOPER-CLEANUP-CONTRACT.md](docs/DEVELOPER-CLEANUP-CONTRACT.md).
 
-- strict allowlisted JSON schemas;
-- path-free fixed user errors;
-- no-follow and regular-file checks around local state;
-- private directory/file permissions;
-- bounded immutable history;
-- atomic publication and preservation of prior valid state on failure;
-- no causal or action-readiness claims from observational data.
-
-See [THREAT-MODEL.md](THREAT-MODEL.md).
+Same-UID malicious concurrent replacement of the Go executable or logical GOCACHE pathname is explicitly out of scope. `SAFE` means a bounded owner-native action under ordinary operation, not immunity to equivalent-user malware. Approval authorizes `go clean -cache` against the logical exact GOCACHE pathname; private paths are never exposed publicly.

@@ -9,6 +9,16 @@ def sha(p): return hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()
 def pkg(d):
     r=run([str(SCRIPTS/'package.sh'),'v0.1.0',str(d)]); assert r.returncode==0,r.stderr
 
+def installer_pkg(d):
+    d=pathlib.Path(d)
+    payload=b'#!/bin/sh\n[ "${1:-}" = doctor ]\n'
+    for arch in ('arm64','amd64'):
+        archive=d/f'stillmac-v0.1.0-darwin-{arch}.tar.gz'
+        with tarfile.open(archive,'w:gz',format=tarfile.USTAR_FORMAT) as t:
+            item=tarfile.TarInfo('stillmac'); item.mode=0o755; item.uid=item.gid=item.mtime=0; item.size=len(payload)
+            t.addfile(item,io.BytesIO(payload))
+    (d/'SHA256SUMS').write_text(''.join(f'{sha(d/f"stillmac-v0.1.0-darwin-{arch}.tar.gz")}  stillmac-v0.1.0-darwin-{arch}.tar.gz\n' for arch in ('arm64','amd64')))
+
 def fake_path(d, archive_dir, uname='Darwin', arch='arm64', uid=None):
     if uid is None: uid=str(os.getuid())
     b=pathlib.Path(d)/'fakebin'; b.mkdir(exist_ok=True)
@@ -48,7 +58,7 @@ class DistributionTests(unittest.TestCase):
  def installer(self, d, mutate=None, old=None, extra_manifest=None, archive=None, uid=None):
   if uid is None: uid=str(os.getuid())
   p=pathlib.Path(d); assets=p/'assets'; assets.mkdir(exist_ok=True)
-  if not (assets/'SHA256SUMS').exists(): pkg(assets)
+  if not (assets/'SHA256SUMS').exists(): installer_pkg(assets)
   if archive: shutil.copy2(archive,assets/'stillmac-v0.1.0-darwin-arm64.tar.gz')
   if extra_manifest is not None: (assets/'SHA256SUMS').write_text(extra_manifest)
   home=p/'home'; home.mkdir(exist_ok=True); bindir=home/'.local'/'bin'; bindir.mkdir(parents=True,exist_ok=True); os.chmod(home,0o700); os.chmod(home/'.local',0o700); os.chmod(bindir,0o700); fb=fake_path(p,assets,uid=uid)
@@ -77,7 +87,7 @@ class DistributionTests(unittest.TestCase):
   self.assertNotIn('. "$ROOT/',text)
  def test_generated_installer_ignores_hostile_inherited_path(self):
   with tempfile.TemporaryDirectory() as d:
-   p=pathlib.Path(d); assets=p/'assets'; assets.mkdir(); pkg(assets)
+   p=pathlib.Path(d); assets=p/'assets'; assets.mkdir(); installer_pkg(assets)
    home=p/'home'; bindir=home/'.local'/'bin'; bindir.mkdir(parents=True)
    for directory in (home,home/'.local',bindir): os.chmod(directory,0o700)
    marker=p/'hostile-path-executed'; hostile=p/'hostile'; hostile.mkdir()
@@ -157,7 +167,7 @@ class DistributionTests(unittest.TestCase):
    r,b=self.installer(d,mutate=mutate); self.assertNotEqual(r.returncode,0); self.assertEqual((b/'stillmac').read_bytes(),old); self.assertEqual(list(b.glob('.stillmac.*')),[])
  def test_installer_selects_amd64(self):
   with tempfile.TemporaryDirectory() as d:
-   p=pathlib.Path(d); assets=p/'assets'; assets.mkdir(); pkg(assets); (assets/'stillmac-v0.1.0-darwin-arm64.tar.gz').unlink()
+   p=pathlib.Path(d); assets=p/'assets'; assets.mkdir(); installer_pkg(assets); (assets/'stillmac-v0.1.0-darwin-arm64.tar.gz').unlink()
    r,b=self.installer(d,mutate=lambda p,b,a:(p/'fakebin/uname').write_text('#!/bin/sh\ncase "$1" in -s) echo Darwin;; -m) echo x86_64;; esac\n')); self.assertEqual(r.returncode,0,r.stderr); self.assertTrue((b/'stillmac').exists())
  def test_installer_no_data_root_on_failure(self):
   with tempfile.TemporaryDirectory() as d:
@@ -198,23 +208,41 @@ class DistributionTests(unittest.TestCase):
   for n in ('README.md','INSTALL.md','UNINSTALL.md','docs/DISTRIBUTION-CONTRACT.md','skills/stillmac/SKILL.md'): self.assertNotIn('--purge-data',(ROOT/n).read_text())
  def test_readme_documents_only_real_cli_commands_and_inactive_install_routes(self):
   text=(ROOT/'README.md').read_text()
-  for command in ('stillmac doctor','stillmac sample','stillmac status','stillmac report','stillmac report --format json','stillmac report --format markdown','stillmac help'):
+  for command in ('stillmac doctor','stillmac sample','stillmac status','stillmac report','stillmac scan','stillmac explain','stillmac plan','stillmac apply','stillmac clean','stillmac protect','stillmac history','stillmac help'):
    self.assertIn(command,text)
   self.assertIn('There is no `stillmac learn` command',text)
+  self.assertIn('curl --fail --location',text)
   self.assertIn('brew install HYPHNLabs/tap/stillmac',text)
   self.assertIn('npx skills add HYPHNLabs/StillMac -g',text)
-  self.assertIn('**neither is active yet**',text)
-  self.assertLess(text.index('## One-line installation routes'),text.index('## Quick start'))
+  self.assertGreaterEqual(text.count('INACTIVE'),3)
+  self.assertIn('inspect the downloaded script',text)
+  self.assertLess(text.index('## Installation routes'),text.index('## Working commands'))
   brew=text.index('```bash\nbrew install HYPHNLabs/tap/stillmac\n```')
   skill=text.index('```bash\nnpx skills add HYPHNLabs/StillMac -g\n```')
   self.assertLess(brew,skill)
- def test_readme_separates_cleanup_vision_from_current_read_only_beta(self):
+ def test_readme_describes_current_cleanup_without_false_reclaim_or_git_action(self):
   text=(ROOT/'README.md').read_text()
-  self.assertIn('StillMac learns what is normal on your Mac',text)
-  for label in ('CURRENT — READ-ONLY','COMING SOON — APPROVAL-GATED','SAFETY GATE — CLEANUP IS NOT ENABLED IN THE CURRENT BETA','caches · stale worktrees','quarantine · rollback'):
+  for label in ('SAFE','REVIEW','BLOCKED_ACTIVE','BLOCKED_DIRTY','BLOCKED_UNMERGED','BLOCKED_UNKNOWN','BLOCKED_CHANGED','PROTECTED'):
    self.assertIn(label,text)
-  self.assertNotIn('stillmac-workflow.svg',text)
-  self.assertFalse((ROOT/'docs/assets/stillmac-workflow.svg').exists())
-  self.assertIn('not implemented in the current beta',text)
-  self.assertLess(text.index('## How StillMac works'),text.index('## Release state'))
+  self.assertIn('owner-native-go-clean-cache',text)
+  self.assertIn('actually frees measured cache bytes',text)
+  self.assertIn('Homebrew is always `REVIEW` with action `none`',text)
+  self.assertIn('Git worktrees are inventory-only',text)
+  self.assertNotIn('cleanup is not enabled',text.lower())
+ def test_cleanup_contract_and_skill_enforce_approval_flow(self):
+  contract=(ROOT/'docs/DEVELOPER-CLEANUP-CONTRACT.md').read_text()
+  skill=(ROOT/'skills/stillmac/SKILL.md').read_text()
+  for token in ('all-safe','15 minutes','target registry','BLOCKED_CHANGED','reclaimed_bytes','owner-native-go-clean-cache','owner_action_failed'):
+   self.assertIn(token,contract)
+  for step in ('scan','list','choice','plan','approval','apply'):
+   self.assertIn(step,skill.lower())
+  self.assertIn('never invent',skill.lower())
+  self.assertIn('scan-only',skill.lower())
+ def test_cleanup_docs_match_owner_native_boundary_and_go_123_requirement(self):
+  removed_feature='quaran'+'tine'
+  for name in ('AGENTS.md','README.md','PRIVACY.md','SECURITY.md','THREAT-MODEL.md','ROADMAP.md','CHANGELOG.md','UNINSTALL.md','docs/ARCHITECTURE.md','docs/DATA-LOCATIONS.md','docs/DEVELOPER-CLEANUP-CONTRACT.md','docs/V0.1-TRACER-CONTRACT.md','skills/stillmac/SKILL.md'):
+   text=(ROOT/name).read_text().lower()
+   self.assertNotIn(removed_feature,text,name)
+  self.assertEqual((ROOT/'go.mod').read_text().splitlines()[2],'go 1.23')
+  self.assertNotIn('Go 1.'+'25',(ROOT/'docs/DEVELOPMENT.md').read_text())
 if __name__=='__main__': unittest.main(verbosity=2)

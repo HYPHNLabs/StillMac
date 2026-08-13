@@ -1,12 +1,13 @@
 # Contributing
 
-StillMac is currently a narrow read-only beta candidate. Contributions must preserve its privacy and safety boundaries.
+StillMac is a narrow baseline and approval-gated developer-cache beta candidate. Contributions must preserve its privacy and safety boundaries.
 
 ## Before proposing a change
 
 - Read [docs/V0.1-TRACER-CONTRACT.md](docs/V0.1-TRACER-CONTRACT.md).
-- Keep the change inside the current process-and-memory scope.
-- Do not add network access, telemetry, scheduling, installation, cleanup, process control, cache/port collection, or LLM dependencies without a separately approved contract.
+- Read [docs/DEVELOPER-CLEANUP-CONTRACT.md](docs/DEVELOPER-CLEANUP-CONTRACT.md) for cleanup work.
+- Keep changes inside one of those current contracts.
+- Do not add network access, telemetry, scheduling, runtime installation, recursive deletion, new cleanup roots, process control, port collection, or LLM dependencies without a separately approved contract.
 - Do not add licence or copyright-holder claims until ownership is formally decided.
 
 ## Engineering rules

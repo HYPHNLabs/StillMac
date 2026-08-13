@@ -1,50 +1,38 @@
-# Data Locations
+# Data locations
 
-## Default
+## Selected data directory
 
-StillMac uses this per-user directory when `--data-dir` is omitted:
-
-```text
-$HOME/Library/Application Support/StillMac
-```
-
-## Custom directory
-
-Every command accepts a custom location:
-
-```bash
-./bin/stillmac sample --data-dir /path/chosen/by/the/user
-```
-
-StillMac does not print the selected path in errors.
-
-## Contents
+The default is `$HOME/Library/Application Support/StillMac`. Commands with `--data-dir PATH` use that exact selected state location. `--scope` is independent and never changes the data directory.
 
 ```text
 StillMac/
-├── current-sample.json   # optional legacy compatibility state
-└── samples/
-    └── sample-*.json     # validated immutable observations
+├── current-sample.json       optional legacy baseline state
+├── samples/                  bounded immutable baseline samples
+└── cleanup/
+    ├── plans/                path-free public plan JSON
+    ├── targets/              private host IDs and exact action targets
+    ├── protected/            stable protected candidate records
+    └── receipts/             success and failure action receipts
 ```
 
-Current sampling writes only immutable entries under `samples/`. Reports are written to standard output and are not retained by StillMac.
+Selected data and cleanup directories use `0700`; regular JSON uses `0600`. State readers reject links, non-regular files, unsafe permissions, malformed schemas, and unknown entries. Reports are not retained.
 
-## Permissions
+## Scanned roots
 
-Where supported:
+Default scan inspects metadata for exactly:
 
-- selected data directory: `0700`;
-- `samples/`: `0700`;
-- state/history files: `0600`.
+```text
+$HOME/Library/Caches/Homebrew
+$HOME/Library/Caches/go-build
+$HOME/.cache/codex-runtimes
+```
 
-Unsafe selected directories, state/history paths, and history-directory entries fail closed when they are symlinks, non-regular objects, malformed, exposed where the contract requires private modes, or outside documented bounds. Unrelated entries in the selected root are not treated as StillMac history and are never pruned.
+It does not inspect whole agent configuration roots, conversations, credentials, memories, skills, config, or arbitrary caches. `--scope PATH` adds Git worktree inventory and does not add `PATH/go-build` or any other invented cache.
 
-## Retention
+## Owner-native Go cache action
 
-Retention is enforced during accepted storage operations. StillMac keeps no more than the newest 672 history samples, 14 days relative to the newest valid sample, 2 MiB per sample, and 128 MiB total encoded history.
-
-There is no background expiry job and no general cleanup capability.
+The exact Go cache remains at `$HOME/Library/Caches/go-build`. After full plan and binding revalidation, StillMac invokes the verified absolute Go executable as `go clean -cache` with an exact sanitized environment. Go owns the cache mutation. StillMac stores only its private plan, target binding, protection, and receipt state.
 
 ## Removal
 
-The beta uninstaller removes only the regular installed binary and retains data. Removing a locally built binary does not remove data. There is no automated recursive purge path; inspect the exact selected directory before manually deleting it and never use a broad cache or Application Support deletion command.
+The uninstaller keeps the complete data directory. Removing retained state is outside the cleanup contract and requires a separately reviewed process.

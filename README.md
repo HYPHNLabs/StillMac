@@ -4,180 +4,137 @@
 
 # StillMac
 
-StillMac learns what is normal on your Mac so future cleanup decisions can be evidence-led, explicit, and safe.
+StillMac is a local macOS diagnostic and developer-cache cleanup CLI. The cleanup slice is deliberately narrow: it can reclaim measured bytes only from the exact Go build cache by invoking the verified owner-native Go action `go clean -cache`. Homebrew, Codex runtimes, and Git worktrees are inventory only.
 
-> **Current beta:** a local, deterministic, read-only process and memory baseline. It runs locally, sends no telemetry, uses no LLM, and cannot terminate processes, clean files, or change system configuration.
+This repository is an unpublished beta candidate. The Go binary has no network client, telemetry, scheduler, LLM dependency, process-control capability, arbitrary deletion, or privilege escalation.
 
-## How StillMac works
+## Installation routes
 
-```text
-+============================================================================+
-|                       CURRENT — READ-ONLY                                  |
-+============================================================================+
-|  +-------------+    +-------------+    +----------------+                  |
-|  | Mac signals | -> |   Explicit  | -> | Private history|                  |
-|  | process +   |    |    sample   |    | validated +    |                  |
-|  | memory      |    | no scheduler|    | bounded locally|                  |
-|  +-------------+    +-------------+    +--------+-------+                  |
-|                                                  |                         |
-|                                      +-----------+-----------+             |
-|                                      v                       v             |
-|                              +---------------+       +---------------+     |
-|                              |    Status     |       |    Report     |     |
-|                              | coverage view |       | evidence view |     |
-|                              +---------------+       +---------------+     |
-+============================================================================+
-|          SAFETY GATE — CLEANUP IS NOT ENABLED IN THE CURRENT BETA          |
-+============================================================================+
-|                    COMING SOON — APPROVAL-GATED                            |
-+============================================================================+
-| +----------+  +-------------+  +-----------+  +---------+  +-------------+ |
-| |  Learn   |  |  Classify   |  | Explain + |  |  User   |  |  Protect +  | |
-| | patterns |->| candidates  |->|  dry run  |->| approves|->|    clean    | |
-| +----------+  +------+------+  +-----------+  +---------+  +------+------+ |
-|                   |                                              |         |
-|           caches · stale worktrees                    quarantine · rollback|
-|           other reviewed files                         verify · action log |
-+============================================================================+
+All three routes are **INACTIVE**. No GitHub Release, activated installer, Homebrew tap formula, or published Agent Skill currently exists. These commands document the intended routes, not working installation claims.
+
+Direct installer, **INACTIVE**. After a real immutable release exists, download to a file, inspect the downloaded script, then run that pinned file:
+
+```bash
+curl --fail --location --output ./stillmac-install-vX.Y.Z.sh https://github.com/HYPHNLabs/StillMac/releases/download/vX.Y.Z/stillmac-install-vX.Y.Z.sh
+less ./stillmac-install-vX.Y.Z.sh
+STILLMAC_VERSION=vX.Y.Z sh ./stillmac-install-vX.Y.Z.sh
 ```
 
-StillMac's objective is not blind cleanup. It is to learn recurring patterns first, distinguish active resources from credible stale candidates, and make any future deletion inspectable and user-approved. Cache inspection, worktree classification, recommendations, quarantine, and deletion are **not implemented in the current beta**.
-
-## Release state
-
-This repository is a **pre-release beta candidate**. The implemented surface is intentionally narrow:
-
-- `doctor` validates the host, native probes, and local data directory;
-- `sample` records one validated process-and-memory observation;
-- `status` reports progress toward a seven-day coverage threshold;
-- `report` renders the latest validated sample as JSON or Markdown.
-
-StillMac has no scheduler, network access, telemetry, cache inspection, port inspection, recommendations, or active remediation. The repository now contains inspect-first installer/update/uninstaller scripts and an Agent Skill; remote release, npx activation, and Homebrew installation remain unavailable until separately activated by a real release workflow. A short release-candidate soak does not count as a completed seven-day observation period.
-
-## One-line installation routes
-
-These are the intended copy-and-paste routes, but **neither is active yet** because no GitHub Release, Homebrew tap, or public Agent Skill source exists. Do not run them until the first release is activated and this notice is removed.
-
-**Homebrew — StillMac CLI**
+Homebrew, **INACTIVE**:
 
 ```bash
 brew install HYPHNLabs/tap/stillmac
 ```
 
-**Agent Skill — cross-agent integration**
+Agent Skill, **INACTIVE**:
 
 ```bash
 npx skills add HYPHNLabs/StillMac -g
 ```
 
-The Homebrew command installs the CLI. The `npx skills add` command installs the thin Agent Skill that invokes the same CLI; it is not a second implementation of StillMac.
+The checked-in `scripts/install.sh` fails closed. See [INSTALL.md](INSTALL.md) and [docs/DISTRIBUTION-CONTRACT.md](docs/DISTRIBUTION-CONTRACT.md).
 
-## Quick start
+## Working commands
 
-After installing or [building from source](#build-from-source), run:
-
-```bash
-stillmac doctor
-stillmac sample
-stillmac status
-stillmac report --format markdown
-```
-
-`sample` records one explicit observation. Run it again only when you intentionally want another observation; StillMac does not schedule collection automatically. There is no `stillmac learn` command—the bounded history created by repeated `sample` calls is the learning record used by `status`.
-
-## Command reference
-
-| Command | Purpose |
-|---|---|
-| `stillmac doctor` | Validate macOS probes and the selected local data directory. |
-| `stillmac sample` | Collect and store one explicit process-and-memory observation. |
-| `stillmac status` | Report progress toward the seven-day coverage threshold. |
-| `stillmac report` | Render the latest observation as Markdown (the default). |
-| `stillmac report --format json` | Render the latest observation as JSON. |
-| `stillmac report --format markdown` | Render the latest observation as Markdown explicitly. |
-| `stillmac help` | Show CLI usage. |
-
-Every operational command accepts `--data-dir PATH` or `--data-dir=PATH`. Without it, StillMac uses `$HOME/Library/Application Support/StillMac`.
-
-## Compatibility
-
-- **Executed locally:** Apple Silicon, macOS 26.5
-- **Target:** macOS 14 or later
-- **Cross-build target:** Darwin `arm64` and `amd64`
-- **Not yet claimed:** runtime compatibility on Intel Macs or macOS 14
-
-Compatibility claims will expand only after execution on those environments.
-
-## Build from source
-
-Requirements: macOS and Go 1.23 or later.
+Build the current source candidate:
 
 ```bash
 mkdir -p ./bin
 go build -trimpath -o ./bin/stillmac ./cmd/stillmac
 ```
 
-No public binary release exists yet. The local distribution package and installer template are verified, but remote GitHub Release assets do not exist; do not claim `brew install` or npx activation works until those assets are published. `scripts/install.sh` intentionally fails closed in this source candidate. After a release exists and provenance is reviewed, use the release-generated installer with its embedded trusted manifest digest; it verifies that digest before archive checks, installs per-user without sudo, and runs doctor only. See [INSTALL.md](INSTALL.md) and [UNINSTALL.md](UNINSTALL.md).
-
-## Use an isolated data directory
+Read-only baseline commands remain available:
 
 ```bash
-STILLMAC_DATA_DIR="$(mktemp -d)/StillMac"
-
-./bin/stillmac doctor --data-dir "$STILLMAC_DATA_DIR"
-./bin/stillmac sample --data-dir "$STILLMAC_DATA_DIR"
-./bin/stillmac status --data-dir "$STILLMAC_DATA_DIR"
-./bin/stillmac report --format json --data-dir "$STILLMAC_DATA_DIR"
-./bin/stillmac report --format markdown --data-dir "$STILLMAC_DATA_DIR"
+stillmac doctor
+stillmac sample
+stillmac status
+stillmac report --format markdown
+stillmac report --format json
 ```
 
-Without `--data-dir`, StillMac uses:
+`sample` is always explicit. There is no `stillmac learn` command and no scheduler.
+
+The developer cleanup flow is scan, inspect, plan, approve, then apply:
+
+```bash
+stillmac scan --format text
+stillmac scan --scope /path/to/project --format json
+stillmac explain sm-0123456789abcdef --format text
+stillmac plan all-safe --format text
+stillmac plan sm-0123456789abcdef sm-fedcba9876543210 --format json
+stillmac apply plan-0123456789abcdef --format json
+stillmac protect sm-0123456789abcdef
+stillmac history --format text
+stillmac clean all
+stillmac clean 1 3
+stillmac help
+```
+
+The IDs above are shape examples only. Text scans number the current rows while also showing stable IDs. A human may use fresh row numbers with interactive `clean` (for example `clean 1 3`); `plan` and agent workflows use stable IDs. Numbers are never persisted. Never invent IDs, and never mix `all` with explicit selections.
+
+`scan`, `explain`, `plan`, `protect`, and `clean` accept `--scope PATH` where documented. Scope adds Git worktree inventory. It does not create a project cache convention and is not derived from `--data-dir`. `plan`, `apply`, `protect`, `history`, and `clean` accept `--data-dir PATH`. Text and JSON are available where shown by `help` and the cleanup contract.
+
+`clean` is only a convenience wrapper for an interactive terminal. It prints every candidate, prints exclusions, creates the exact plan, and accepts only `apply PLAN_ID`. Non-TTY callers must use `plan` and `apply`.
+
+## Decisions
+
+- `SAFE`: under ordinary operation, the exact Go build cache and owner-native Go tool satisfy the bounded executable rule; this is not immunity to equivalent-user malware.
+- `REVIEW`: inventory worth human review, with no executable action.
+- `PROTECTED`: explicitly protected in private StillMac state.
+- `BLOCKED_ACTIVE`: current, main, locked, or activity not safely disproved.
+- `BLOCKED_DIRTY`: a Git worktree has local changes.
+- `BLOCKED_UNMERGED`: Git cannot prove HEAD is merged into `main`.
+- `BLOCKED_UNKNOWN`: identity or safety cannot be established.
+- `BLOCKED_CHANGED`: apply-time state differs from the plan.
+
+There is no generic `BLOCKED` decision.
+
+## Cleanup boundaries
+
+Default scan roots are exactly:
+
+- `$HOME/Library/Caches/Homebrew`
+- `$HOME/Library/Caches/go-build`
+- `$HOME/.cache/codex-runtimes`
+
+Codex runtime data is never executable in this release. Without injected inactivity proof it is `BLOCKED_ACTIVE`; even with proof it is `REVIEW`. StillMac never scans the whole `.codex`, `.claude`, or `.hermes` trees, Application Support conversations, credentials, memories, skills, config, or cache contents.
+
+Git worktrees are inventory-only. StillMac uses `git worktree list --porcelain` and per-worktree status and merge checks, emits one path-free candidate per linked worktree, and never executes a Git cleanup action or uses force.
+
+Homebrew is always `REVIEW` with action `none` until a narrowly bounded owner-native operation is designed. Go is `SAFE` only when StillMac resolves an absolute Go executable, follows it to a regular executable with acceptable ownership and permissions, binds its device, inode, fingerprint and version, and verifies under a minimal fixed environment that `go env GOCACHE` equals the exact allowlisted `$HOME/Library/Caches/go-build`. Failure to establish any part is `BLOCKED_UNKNOWN`.
+
+Apply revalidates the plan, host, protection, rule, cache identity and fingerprint, and private executable binding immediately before invoking only `<verified-absolute-go> clean -cache` without a shell. These checks reduce accidental or stale changes but are not atomic with `execve` or Go pathname resolution. Approval authorizes `go clean -cache` against the logical exact GOCACHE pathname; malicious concurrent same-UID replacement is explicitly out of scope. It then measures the exact cache again. A successful receipt uses method `owner-native-go-clean-cache`, result `cleaned`, `moved_bytes=0`, and `removed_bytes` and `reclaimed_bytes` equal to `max(before_bytes-after_bytes, 0)`. This action actually frees measured cache bytes, and later Go builds may spend time rebuilding them. A failed owner action reports `owner_action_failed` with no claimed removed or reclaimed bytes.
+
+Plans expire after 15 minutes. They are schema-versioned, hash-addressed, bound to an opaque host binding and a private target registry, and revalidated immediately before action. Protection, root replacement, fingerprint change, decision change, rule change, unsafe paths, or state corruption fails closed.
+
+## Data and privacy
+
+The default data directory is:
 
 ```text
 $HOME/Library/Application Support/StillMac
 ```
 
-`sample` requires access to macOS `/bin/ps` and `/usr/sbin/sysctl`. It stores only the allowlisted fields documented in [PRIVACY.md](PRIVACY.md).
+Baseline history, cleanup plans, private target registries, protection records, and receipts are local. Private directories use `0700` and regular state files use `0600`. Public JSON excludes absolute HOME and project paths, executable paths, usernames, command arguments, and unrelated filenames.
 
-## What `status` means
+The uninstaller removes only the regular installed binary and keeps baseline and cleanup state. See [UNINSTALL.md](UNINSTALL.md), [PRIVACY.md](PRIVACY.md), and [docs/DATA-LOCATIONS.md](docs/DATA-LOCATIONS.md).
 
-Coverage eligibility requires all three gates:
+## Compatibility and verification
 
-- at least seven days of elapsed observation span;
-- observations on at least seven distinct UTC dates;
-- at least 84 distinct 30-minute coverage intervals.
-
-`coverage_ready` means only that these coverage gates passed. It does not establish causation, enable recommendations, or authorise actions.
-
-## Data and removal
-
-StillMac writes only its selected data directory. Directories use mode `0700` and state/history files use mode `0600` where practical. History is bounded by count, age, per-file size, and total size.
-
-`scripts/uninstall.sh` removes the regular installed binary and keeps data. It never recursively deletes data: safe descriptor-relative deletion is not implemented in beta. To remove observations, inspect the exact data path first, refuse symlinks/non-regular objects, and manually delete only the reviewed path. StillMac never deletes unrelated files.
-
-See [docs/DATA-LOCATIONS.md](docs/DATA-LOCATIONS.md) and [PRIVACY.md](PRIVACY.md).
-
-## Development and verification
+- Executed locally: Apple Silicon, macOS 26.5.
+- Target: macOS 14 or later.
+- Cross-build targets: Darwin arm64 and amd64.
+- Not claimed: Intel runtime compatibility or macOS 14 runtime verification.
 
 ```bash
 gofmt -w .
 go test -count=1 -race ./...
 go vet ./...
 go build -trimpath -o ./bin/stillmac ./cmd/stillmac
+python3 -m unittest discover -s tests -v
+sh -n scripts/*.sh scripts/install.sh.tmpl
+git diff --check
 ```
 
-The test suite includes intentionally hostile **synthetic** paths, usernames, and credential-shaped strings to prove they do not leak into state, reports, or user-visible errors. They are not real credentials or user data.
-
-See:
-
-- [docs/V0.1-TRACER-CONTRACT.md](docs/V0.1-TRACER-CONTRACT.md) — exact command, schema, storage, and exit-code contract
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — component boundaries
-- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — local engineering workflow
-- [THREAT-MODEL.md](THREAT-MODEL.md) — security assumptions and mitigations
-- [CONTRIBUTING.md](CONTRIBUTING.md) — contribution rules
-
-## Licence
-
-StillMac source code and documentation are licensed under the [Apache License 2.0](LICENSE). The StillMac name and brand assets are not granted for use as trademarks by that licence; Apache-2.0 permits only reasonable and customary use to describe the work's origin.
-
-The approved matte [app icon](assets/brand/stillmac-app-icon-matte-1024.png) and [horizontal logo](assets/brand/stillmac-logo-matte-dark.png) are included for consistent StillMac identification.
+Normative behaviour is in [docs/V0.1-TRACER-CONTRACT.md](docs/V0.1-TRACER-CONTRACT.md) and [docs/DEVELOPER-CLEANUP-CONTRACT.md](docs/DEVELOPER-CLEANUP-CONTRACT.md).

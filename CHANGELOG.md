@@ -1,27 +1,25 @@
 # Changelog
 
-All notable changes will be documented in this file.
-
 StillMac has not published a release.
 
 ## Unreleased
 
 ### Added
 
-- Deterministic `doctor`, `sample`, `status`, and `report` commands.
-- Allowlisted macOS process and memory collection.
-- Strict local sample, state, status, doctor, and report schemas.
-- Bounded immutable history with private permissions and fail-closed validation.
-- Seven-day elapsed-span, observed-day, and interval-coverage status gates.
-- Preliminary JSON and Markdown reports with explicit confidence and causation limits.
-- Privacy-hostile fixtures, storage failure injection, race tests, and path-free builds.
+- Existing deterministic `doctor`, `sample`, `status`, and `report` baseline commands.
+- `scan`, `explain`, `plan`, `apply`, `clean`, `protect`, and `history` developer cleanup commands.
+- Exact-root Homebrew and Go cache rules, conservative Codex runtime inventory, and path-free Git worktree classification.
+- Schema-versioned hash-addressed 15-minute plans and integrity-bound private target registries.
+- Persistent protection, owner-native Go cache cleaning, structured partial-failure receipts, and strict history validation.
+- Deterministic dependency injection for HOME, clock, host ID, Git, Go cleaner, TTY, input, and cleanup service.
 
 ### Security
 
-- Symbolic-link and non-regular state objects are rejected.
-- Unknown, malformed, oversized, duplicate, and out-of-bound history fails closed.
-- Native command output and private paths are excluded from state and user-visible errors.
+- No arbitrary plan paths, recursive removal, force, cache-root rename, Homebrew action, Git action, or Codex action.
+- Apply revalidates host, plan, registry, protection, rule, target, parents, device, inode, decision, cache fingerprint, executable identity, executable fingerprint, version, and exact Go configuration.
+- Public JSON excludes absolute private paths, usernames, command arguments, and unrelated filenames.
+- Successful Go receipts report method `owner-native-go-clean-cache`, zero moved bytes, and measured non-negative removed and reclaimed bytes. Owner-action failures claim none.
 
-### Not included
+### Distribution
 
-- No scheduler, remote activation, telemetry, recommendations, process action, cache inspection, or port inspection. Distribution scripts and a thin Agent Skill are present, but no release, tap, or npx activation exists.
+- Direct curl, Homebrew, and npx routes remain inactive and are documented as such.
