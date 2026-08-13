@@ -13,7 +13,7 @@ cleanup(){ rm -rf -- "$WORK"; }
 trap cleanup EXIT INT TERM
 for arch in arm64 amd64; do
   bin="$WORK/stillmac-$arch"
-  (cd "$ROOT" && GOOS=darwin GOARCH=$arch CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o "$bin" ./cmd/stillmac)
+  (cd "$ROOT" && GOOS=darwin GOARCH=$arch CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags='-s -w' -o "$bin" ./cmd/stillmac)
   chmod 755 "$bin"
   archive="$OUT/stillmac-$VERSION-darwin-$arch.tar.gz"
   # Python is a build-time tool: normalize every tar field, including uid/gid/time.

@@ -28,6 +28,66 @@ def fake_path(d, archive_dir, uname='Darwin', arch='arm64', uid=None):
     (b/'curl').chmod(0o755); return b
 
 class DistributionTests(unittest.TestCase):
+ def test_activation_preserves_existing_regular_output(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=pathlib.Path(d); dist=p/'dist'; dist.mkdir(); self._activation_dist(dist)
+   out=p/'out'; out.write_text('keep')
+   r=run([str(SCRIPTS/'activate-installer.sh'),'v0.1.0',str(dist),str(out)])
+   self.assertNotEqual(r.returncode,0); self.assertEqual(out.read_text(),'keep')
+ def test_activation_rejects_world_writable_parent(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=pathlib.Path(d); dist=p/'dist'; dist.mkdir(); self._activation_dist(dist); parent=p/'unsafe'; parent.mkdir(); os.chmod(parent,0o777)
+   r=run([str(SCRIPTS/'activate-installer.sh'),'v0.1.0',str(dist),str(parent/'out')])
+   self.assertNotEqual(r.returncode,0); self.assertFalse((parent/'out').exists())
+ def test_activation_concurrent_creation_is_exclusive(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=pathlib.Path(d); dist=p/'dist'; dist.mkdir(); self._activation_dist(dist); out=p/'out'
+   rs=[subprocess.Popen([str(SCRIPTS/'activate-installer.sh'),'v0.1.0',str(dist),str(out)],cwd=ROOT,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE) for _ in range(12)]
+   results=[]
+   for x in rs:
+    stdout,stderr=x.communicate(); results.append((x.returncode,stdout,stderr))
+   self.assertEqual(sum(code==0 for code,_,_ in results),1); self.assertEqual(out.read_bytes(), (SCRIPTS/'install.sh.tmpl').read_bytes().replace(b'@TRUSTED_MANIFEST_SHA256@',sha(dist/'SHA256SUMS').encode()))
+ def test_publisher_directory_sync_failure_removes_created_output(self):
+  import importlib.util
+  with tempfile.TemporaryDirectory() as d:
+   p=pathlib.Path(d); template=p/'template'; template.write_text('digest=@TRUSTED_MANIFEST_SHA256@\n'); digest='a'*64
+   spec=importlib.util.spec_from_file_location('publish_installer',SCRIPTS/'publish-installer.py'); module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+   original=module.sync_directory
+   try:
+    module.sync_directory=lambda _fd: (_ for _ in ()).throw(OSError('injected directory sync failure'))
+    self.assertNotEqual(module.main([str(template),str(p),'out',digest]),0)
+   finally:
+    module.sync_directory=original
+   self.assertFalse((p/'out').exists())
+
+ def _activation_dist(self, dist):
+  names=['stillmac-v0.1.0-darwin-arm64.tar.gz','stillmac-v0.1.0-darwin-amd64.tar.gz']
+  for n in names: (dist/n).write_bytes(b'artifact')
+  (dist/'SHA256SUMS').write_text(''.join(f'{sha(dist/n)}  {n}\n' for n in names))
+ def test_package_build_disables_vcs_metadata(self):
+  self.assertIn('go build -buildvcs=false -trimpath', (SCRIPTS/'package.sh').read_text())
+ def test_activation_script_syntax_and_success(self):
+  self.assertEqual(run(['sh','-n',str(SCRIPTS/'activate-installer.sh')]).returncode,0)
+  with tempfile.TemporaryDirectory() as d:
+   p=pathlib.Path(d); dist=p/'dist'; dist.mkdir()
+   names=['stillmac-v0.1.0-darwin-arm64.tar.gz','stillmac-v0.1.0-darwin-amd64.tar.gz']
+   for i,n in enumerate(names): (dist/n).write_bytes(bytes([i+1])*17)
+   (dist/'SHA256SUMS').write_text(''.join(f'{sha(dist/n)}  {n}\n' for n in names))
+   out=p/'activated.sh'; r=run([str(SCRIPTS/'activate-installer.sh'),'v0.1.0',str(dist),str(out)])
+   self.assertEqual(r.returncode,0,r.stderr); self.assertTrue(out.stat().st_mode & 0o111)
+   text=out.read_text(); self.assertNotIn('@TRUSTED_MANIFEST_SHA256@',text); self.assertEqual(text.count('TRUSTED_MANIFEST_SHA256='),1)
+ def test_activation_rejects_tampered_or_malformed_distribution(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=pathlib.Path(d); dist=p/'dist'; dist.mkdir(); names=['stillmac-v0.1.0-darwin-arm64.tar.gz','stillmac-v0.1.0-darwin-amd64.tar.gz']
+   for n in names: (dist/n).write_bytes(b'artifact')
+   (dist/'SHA256SUMS').write_text('0'*64+'  '+names[0]+'\\n'+'0'*64+'  '+names[0]+'\\n')
+   self.assertNotEqual(run([str(SCRIPTS/'activate-installer.sh'),'v0.1.0',str(dist),str(p/'out')]).returncode,0)
+ def test_activation_refuses_symlink_output(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=pathlib.Path(d); dist=p/'dist'; dist.mkdir(); names=['stillmac-v0.1.0-darwin-arm64.tar.gz','stillmac-v0.1.0-darwin-amd64.tar.gz']
+   for n in names: (dist/n).write_bytes(b'x')
+   (dist/'SHA256SUMS').write_text(''.join(f'{sha(dist/n)}  {n}\n' for n in names)); target=p/'target'; target.write_text('x'); out=p/'out'; out.symlink_to(target)
+   self.assertNotEqual(run([str(SCRIPTS/'activate-installer.sh'),'v0.1.0',str(dist),str(out)]).returncode,0)
  def test_version_rejects_evil(self): self.assertNotEqual(run([str(SCRIPTS/'package.sh'),'v1.2.3evil',str(ROOT/'tmp-out')]).returncode,0)
  def test_version_requires_three_numeric_components(self):
   for v in ('1.2.3','v1.2','v1..3','v01.2.3','v1.2.3-rc1'): self.assertNotEqual(run([str(SCRIPTS/'package.sh'),v,'/tmp/stillmac-version']).returncode,0)

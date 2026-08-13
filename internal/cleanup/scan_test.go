@@ -11,6 +11,16 @@ import (
 
 var fixedNow = time.Date(2026, 8, 13, 10, 0, 0, 0, time.UTC)
 
+func TestScanReturnsNonNilEmptySliceWhenThereAreNoCandidates(t *testing.T) {
+	items, err := ScanWithConfig(ScanConfig{Home: t.TempDir(), Now: fixedNow})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if items == nil || len(items) != 0 {
+		t.Fatalf("items = %#v, want non-nil empty slice", items)
+	}
+}
+
 func TestAddTreeBytesFailsClosedOnOverflow(t *testing.T) {
 	if _, err := addTreeBytes(1, -1); err == nil {
 		t.Fatal("negative size accepted")

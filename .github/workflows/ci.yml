@@ -24,11 +24,11 @@ jobs:
       - name: Vet
         run: go vet ./...
       - name: Build current runner
-        run: go build -trimpath -o /tmp/stillmac ./cmd/stillmac
+        run: go build -buildvcs=false -trimpath -o /tmp/stillmac ./cmd/stillmac
       - name: Cross-build Darwin targets
         run: |
-          GOOS=darwin GOARCH=arm64 go build -trimpath -o /tmp/stillmac-darwin-arm64 ./cmd/stillmac
-          GOOS=darwin GOARCH=amd64 go build -trimpath -o /tmp/stillmac-darwin-amd64 ./cmd/stillmac
+          GOOS=darwin GOARCH=arm64 go build -buildvcs=false -trimpath -o /tmp/stillmac-darwin-arm64 ./cmd/stillmac
+          GOOS=darwin GOARCH=amd64 go build -buildvcs=false -trimpath -o /tmp/stillmac-darwin-amd64 ./cmd/stillmac
       - name: Reject runner workspace paths in binaries
         run: |
           for artifact in /tmp/stillmac /tmp/stillmac-darwin-arm64 /tmp/stillmac-darwin-amd64; do

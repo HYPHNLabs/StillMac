@@ -11,7 +11,7 @@ StillMac uses the Go standard library only.
 
 ```bash
 mkdir -p ./bin
-go build -trimpath -o ./bin/stillmac ./cmd/stillmac
+go build -buildvcs=false -trimpath -o ./bin/stillmac ./cmd/stillmac
 ```
 
 `-trimpath` is mandatory for candidate/release builds.
@@ -29,8 +29,8 @@ go vet ./...
 Cross-building proves compilation, not runtime compatibility:
 
 ```bash
-GOOS=darwin GOARCH=arm64 go build -trimpath -o /tmp/stillmac-darwin-arm64 ./cmd/stillmac
-GOOS=darwin GOARCH=amd64 go build -trimpath -o /tmp/stillmac-darwin-amd64 ./cmd/stillmac
+GOOS=darwin GOARCH=arm64 go build -buildvcs=false -trimpath -o /tmp/stillmac-darwin-arm64 ./cmd/stillmac
+GOOS=darwin GOARCH=amd64 go build -buildvcs=false -trimpath -o /tmp/stillmac-darwin-amd64 ./cmd/stillmac
 ```
 
 Do not claim Intel support until the `amd64` artifact has been executed and tested on Intel hardware or an approved equivalent environment.
