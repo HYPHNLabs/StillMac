@@ -12,12 +12,18 @@ This repository is an unpublished beta candidate. The Go binary has no network c
 
 All three routes are **INACTIVE**. No GitHub Release, activated installer, Homebrew tap formula, or published Agent Skill currently exists. These commands document the intended routes, not working installation claims.
 
-Direct installer, **INACTIVE**. After a real immutable release exists, download to a file, inspect the downloaded script, then run that pinned file:
+Direct installer, **INACTIVE until the `v0.1.0` release asset exists**. The concise intended command is:
 
 ```bash
-curl --fail --location --output ./stillmac-install-vX.Y.Z.sh https://github.com/HYPHNLabs/StillMac/releases/download/vX.Y.Z/stillmac-install-vX.Y.Z.sh
-less ./stillmac-install-vX.Y.Z.sh
-STILLMAC_VERSION=vX.Y.Z sh ./stillmac-install-vX.Y.Z.sh
+curl -fsSL https://github.com/HYPHNLabs/StillMac/releases/download/v0.1.0/stillmac-install-v0.1.0.sh | sh
+```
+
+For the safer inspect-first route, download that same pinned release asset, inspect the downloaded script, then run it:
+
+```bash
+curl -fsSL -o stillmac-install-v0.1.0.sh https://github.com/HYPHNLabs/StillMac/releases/download/v0.1.0/stillmac-install-v0.1.0.sh
+less stillmac-install-v0.1.0.sh
+sh stillmac-install-v0.1.0.sh
 ```
 
 Homebrew, **INACTIVE**:
@@ -33,6 +39,23 @@ npx skills add HYPHNLabs/StillMac -g
 ```
 
 The checked-in `scripts/install.sh` fails closed. See [INSTALL.md](INSTALL.md) and [docs/DISTRIBUTION-CONTRACT.md](docs/DISTRIBUTION-CONTRACT.md).
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["Install v0.1.0<br/>(when released)"] --> B["Scan now"]
+    B --> C["Review numbered candidates"]
+    C --> D["Select IDs or all-safe"]
+    D --> E["Preview 15-minute plan"]
+    E --> F["Approve exact plan"]
+    F --> G["Revalidate"]
+    G --> H["Clean verified Go cache"]
+    H --> I["Receipt + history"]
+    C --> J["Homebrew · Codex · Git<br/>inventory only"]
+```
+
+StillMac never jumps from scan to cleanup. Only a verified Go build-cache candidate can enter the approval path; every other current family remains visible but non-executable.
 
 ## Working commands
 

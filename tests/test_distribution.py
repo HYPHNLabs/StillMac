@@ -211,7 +211,10 @@ class DistributionTests(unittest.TestCase):
   for command in ('stillmac doctor','stillmac sample','stillmac status','stillmac report','stillmac scan','stillmac explain','stillmac plan','stillmac apply','stillmac clean','stillmac protect','stillmac history','stillmac help'):
    self.assertIn(command,text)
   self.assertIn('There is no `stillmac learn` command',text)
-  self.assertIn('curl --fail --location',text)
+  self.assertIn('curl -fsSL https://github.com/HYPHNLabs/StillMac/releases/download/v0.1.0/stillmac-install-v0.1.0.sh | sh',text)
+  self.assertNotIn('vX.Y.Z',text)
+  for step in ('Scan now','Review numbered candidates','Select IDs or all-safe','Preview 15-minute plan','Approve exact plan','Revalidate','Clean verified Go cache','Receipt + history'):
+   self.assertIn(step,text)
   self.assertIn('brew install HYPHNLabs/tap/stillmac',text)
   self.assertIn('npx skills add HYPHNLabs/StillMac -g',text)
   self.assertGreaterEqual(text.count('INACTIVE'),3)
