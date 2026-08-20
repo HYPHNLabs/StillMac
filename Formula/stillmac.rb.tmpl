@@ -1,16 +1,10 @@
 class Stillmac < Formula
-  desc "Local, read-only macOS process and memory baseline"
+  desc "Local macOS evidence and approval-gated developer-cache cleanup"
   homepage "https://github.com/HYPHNLabs/StillMac"
   version "@VERSION@"
-  on_macos do
-    on_arm do
-      url "https://github.com/HYPHNLabs/StillMac/releases/download/v#{version}/stillmac-v#{version}-darwin-arm64.tar.gz"
-      sha256 "@ARM64_SHA256@"
-    end
-    on_intel do
-      url "https://github.com/HYPHNLabs/StillMac/releases/download/v#{version}/stillmac-v#{version}-darwin-amd64.tar.gz"
-      sha256 "@AMD64_SHA256@"
-    end
+  on_arm do
+    url "https://github.com/HYPHNLabs/StillMac/releases/download/v#{version}/stillmac-v#{version}-darwin-arm64.tar.gz"
+    sha256 "@ARM64_SHA256@"
   end
   def install
     bin.install "stillmac"

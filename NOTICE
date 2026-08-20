@@ -1,0 +1,6 @@
+StillMac
+Copyright 2026 HYPHN Labs
+
+StillMac is an independent implementation developed for HYPHN Labs. The runtime uses the Go standard library and macOS native utilities; it has no third-party runtime dependencies.
+
+The StillMac name and brand assets are owned by HYPHN Labs and are not licensed as trademarks by the Apache License 2.0.

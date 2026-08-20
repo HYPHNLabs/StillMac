@@ -12,12 +12,11 @@ def pkg(d):
 def installer_pkg(d):
     d=pathlib.Path(d)
     payload=b'#!/bin/sh\n[ "${1:-}" = doctor ]\n'
-    for arch in ('arm64','amd64'):
-        archive=d/f'stillmac-v0.1.0-darwin-{arch}.tar.gz'
-        with tarfile.open(archive,'w:gz',format=tarfile.USTAR_FORMAT) as t:
-            item=tarfile.TarInfo('stillmac'); item.mode=0o755; item.uid=item.gid=item.mtime=0; item.size=len(payload)
-            t.addfile(item,io.BytesIO(payload))
-    (d/'SHA256SUMS').write_text(''.join(f'{sha(d/f"stillmac-v0.1.0-darwin-{arch}.tar.gz")}  stillmac-v0.1.0-darwin-{arch}.tar.gz\n' for arch in ('arm64','amd64')))
+    archive=d/'stillmac-v0.1.0-darwin-arm64.tar.gz'
+    with tarfile.open(archive,'w:gz',format=tarfile.USTAR_FORMAT) as t:
+        item=tarfile.TarInfo('stillmac'); item.mode=0o755; item.uid=item.gid=item.mtime=0; item.size=len(payload)
+        t.addfile(item,io.BytesIO(payload))
+    (d/'SHA256SUMS').write_text(f'{sha(archive)}  {archive.name}\n')
 
 def fake_path(d, archive_dir, uname='Darwin', arch='arm64', uid=None):
     if uid is None: uid=str(os.getuid())
@@ -59,9 +58,23 @@ class DistributionTests(unittest.TestCase):
    finally:
     module.sync_directory=original
    self.assertFalse((p/'out').exists())
+ def test_publisher_fchmod_failure_removes_created_output(self):
+  import importlib.util
+  with tempfile.TemporaryDirectory() as d:
+   p=pathlib.Path(d); template=p/'template'; template.write_text('digest=@TRUSTED_MANIFEST_SHA256@\n'); digest='a'*64
+   spec=importlib.util.spec_from_file_location('publish_installer_fchmod',SCRIPTS/'publish-installer.py')
+   if spec is None or spec.loader is None: self.fail('cannot load publisher module')
+   module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+   original=module.os.fchmod
+   try:
+    module.os.fchmod=lambda _fd,_mode: (_ for _ in ()).throw(OSError('injected fchmod failure'))
+    self.assertNotEqual(module.main([str(template),str(p),'out',digest]),0)
+   finally:
+    module.os.fchmod=original
+   self.assertFalse((p/'out').exists())
 
  def _activation_dist(self, dist):
-  names=['stillmac-v0.1.0-darwin-arm64.tar.gz','stillmac-v0.1.0-darwin-amd64.tar.gz']
+  names=['stillmac-v0.1.0-darwin-arm64.tar.gz']
   for n in names: (dist/n).write_bytes(b'artifact')
   (dist/'SHA256SUMS').write_text(''.join(f'{sha(dist/n)}  {n}\n' for n in names))
  def test_package_build_disables_vcs_metadata(self):
@@ -70,21 +83,41 @@ class DistributionTests(unittest.TestCase):
   self.assertEqual(run(['sh','-n',str(SCRIPTS/'activate-installer.sh')]).returncode,0)
   with tempfile.TemporaryDirectory() as d:
    p=pathlib.Path(d); dist=p/'dist'; dist.mkdir()
-   names=['stillmac-v0.1.0-darwin-arm64.tar.gz','stillmac-v0.1.0-darwin-amd64.tar.gz']
+   names=['stillmac-v0.1.0-darwin-arm64.tar.gz']
    for i,n in enumerate(names): (dist/n).write_bytes(bytes([i+1])*17)
    (dist/'SHA256SUMS').write_text(''.join(f'{sha(dist/n)}  {n}\n' for n in names))
    out=p/'activated.sh'; r=run([str(SCRIPTS/'activate-installer.sh'),'v0.1.0',str(dist),str(out)])
    self.assertEqual(r.returncode,0,r.stderr); self.assertTrue(out.stat().st_mode & 0o111)
    text=out.read_text(); self.assertNotIn('@TRUSTED_MANIFEST_SHA256@',text); self.assertEqual(text.count('TRUSTED_MANIFEST_SHA256='),1)
+ def test_activation_default_output_accepts_relative_dist(self):
+  with tempfile.TemporaryDirectory(dir=ROOT) as d:
+   dist=pathlib.Path(d); self._activation_dist(dist)
+   relative_dist=os.path.relpath(dist,ROOT)
+   r=run([str(SCRIPTS/'activate-installer.sh'),'v0.1.0',relative_dist])
+   self.assertEqual(r.returncode,0,r.stderr)
+   self.assertTrue((dist/'stillmac-install-v0.1.0.sh').is_file())
+ def test_activation_rejects_relative_symlink_dist(self):
+  with tempfile.TemporaryDirectory(dir=ROOT) as d:
+   base=pathlib.Path(d); dist=base/'dist'; dist.mkdir(); self._activation_dist(dist)
+   link=base/'linked-dist'; link.symlink_to(dist, target_is_directory=True)
+   r=run([str(SCRIPTS/'activate-installer.sh'),'v0.1.0',os.path.relpath(link,ROOT)])
+   self.assertNotEqual(r.returncode,0)
+   self.assertFalse((dist/'stillmac-install-v0.1.0.sh').exists())
+ def test_activation_output_mode_is_exact_under_restrictive_umask(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=pathlib.Path(d); dist=p/'dist'; dist.mkdir(); self._activation_dist(dist); out=p/'activated.sh'
+   r=run([str(SCRIPTS/'activate-installer.sh'),'v0.1.0',str(dist),str(out)],umask=0o077)
+   self.assertEqual(r.returncode,0,r.stderr)
+   self.assertEqual(stat.S_IMODE(out.stat().st_mode),0o755)
  def test_activation_rejects_tampered_or_malformed_distribution(self):
   with tempfile.TemporaryDirectory() as d:
-   p=pathlib.Path(d); dist=p/'dist'; dist.mkdir(); names=['stillmac-v0.1.0-darwin-arm64.tar.gz','stillmac-v0.1.0-darwin-amd64.tar.gz']
+   p=pathlib.Path(d); dist=p/'dist'; dist.mkdir(); names=['stillmac-v0.1.0-darwin-arm64.tar.gz']
    for n in names: (dist/n).write_bytes(b'artifact')
    (dist/'SHA256SUMS').write_text('0'*64+'  '+names[0]+'\\n'+'0'*64+'  '+names[0]+'\\n')
    self.assertNotEqual(run([str(SCRIPTS/'activate-installer.sh'),'v0.1.0',str(dist),str(p/'out')]).returncode,0)
  def test_activation_refuses_symlink_output(self):
   with tempfile.TemporaryDirectory() as d:
-   p=pathlib.Path(d); dist=p/'dist'; dist.mkdir(); names=['stillmac-v0.1.0-darwin-arm64.tar.gz','stillmac-v0.1.0-darwin-amd64.tar.gz']
+   p=pathlib.Path(d); dist=p/'dist'; dist.mkdir(); names=['stillmac-v0.1.0-darwin-arm64.tar.gz']
    for n in names: (dist/n).write_bytes(b'x')
    (dist/'SHA256SUMS').write_text(''.join(f'{sha(dist/n)}  {n}\n' for n in names)); target=p/'target'; target.write_text('x'); out=p/'out'; out.symlink_to(target)
    self.assertNotEqual(run([str(SCRIPTS/'activate-installer.sh'),'v0.1.0',str(dist),str(out)]).returncode,0)
@@ -99,7 +132,7 @@ class DistributionTests(unittest.TestCase):
    p=pathlib.Path(d); (p/'keep').write_text('keep'); pkg(p); self.assertEqual((p/'keep').read_text(),'keep')
  def test_package_names_and_manifest(self):
   with tempfile.TemporaryDirectory() as d:
-   p=pathlib.Path(d); pkg(p); self.assertEqual(sorted(x.name for x in p.iterdir()),['SHA256SUMS','stillmac-v0.1.0-darwin-amd64.tar.gz','stillmac-v0.1.0-darwin-arm64.tar.gz']); self.assertEqual(len((p/'SHA256SUMS').read_text().splitlines()),2)
+   p=pathlib.Path(d); pkg(p); self.assertEqual(sorted(x.name for x in p.iterdir()),['SHA256SUMS','stillmac-v0.1.0-darwin-arm64.tar.gz']); self.assertEqual(len((p/'SHA256SUMS').read_text().splitlines()),1)
  def test_package_manifest_checksums_verify(self):
   with tempfile.TemporaryDirectory() as d:
    p=pathlib.Path(d); pkg(p)
@@ -112,7 +145,7 @@ class DistributionTests(unittest.TestCase):
  def test_package_is_byte_deterministic(self):
   with tempfile.TemporaryDirectory() as d:
    a=pathlib.Path(d)/'a'; b=pathlib.Path(d)/'b'; a.mkdir(); b.mkdir(); pkg(a); pkg(b)
-   for n in ('SHA256SUMS','stillmac-v0.1.0-darwin-arm64.tar.gz','stillmac-v0.1.0-darwin-amd64.tar.gz'): self.assertEqual((a/n).read_bytes(),(b/n).read_bytes())
+   for n in ('SHA256SUMS','stillmac-v0.1.0-darwin-arm64.tar.gz'): self.assertEqual((a/n).read_bytes(),(b/n).read_bytes())
  def test_installer_no_python_or_bypass(self):
   s=(SCRIPTS/'install.sh').read_text(); self.assertNotIn('python3',s); self.assertNotIn('--test-local',s); self.assertIn('fail-closed',s)
  def installer(self, d, mutate=None, old=None, extra_manifest=None, archive=None, uid=None):
@@ -123,7 +156,7 @@ class DistributionTests(unittest.TestCase):
   if extra_manifest is not None: (assets/'SHA256SUMS').write_text(extra_manifest)
   home=p/'home'; home.mkdir(exist_ok=True); bindir=home/'.local'/'bin'; bindir.mkdir(parents=True,exist_ok=True); os.chmod(home,0o700); os.chmod(home/'.local',0o700); os.chmod(bindir,0o700); fb=fake_path(p,assets,uid=uid)
   activated=p/'install.sh'; manifest_hash=sha(assets/'SHA256SUMS'); template=(SCRIPTS/'install.sh.tmpl').read_text().replace('@TRUSTED_MANIFEST_SHA256@',manifest_hash); template=template.replace("PATH='/usr/bin:/bin:/usr/sbin:/sbin'",f"PATH='{fb}:/usr/bin:/bin:/usr/sbin:/sbin'"); activated.write_text(template); activated.chmod(0o755)
-  env=os.environ.copy(); env.pop('EUID', None); env.update(HOME=str(home),STILLMAC_DOWNLOAD_BASE='https://fake/release',ASSET_DIR=str(assets),PATH=str(fb)+':'+os.environ['PATH'])
+  env=os.environ.copy(); env.pop('EUID', None); env.update(HOME=str(home),STILLMAC_VERSION='v0.1.0',STILLMAC_DOWNLOAD_BASE='https://fake/release',ASSET_DIR=str(assets),PATH=str(fb)+':'+os.environ['PATH'])
   if mutate: mutate(p,bindir,assets)
   return run([str(activated)],env=env),bindir
  def test_generated_installer_is_standalone(self):
@@ -154,7 +187,7 @@ class DistributionTests(unittest.TestCase):
    for command in ('uname','curl','shasum','awk','tar'):
     shim=hostile/command; shim.write_text(f'#!/bin/sh\ntouch "{marker}"\nexit 99\n'); shim.chmod(0o755)
    activated=p/'install.sh'; activated.write_text((SCRIPTS/'install.sh.tmpl').read_text().replace('@TRUSTED_MANIFEST_SHA256@',sha(assets/'SHA256SUMS'))); activated.chmod(0o755)
-   env=os.environ.copy(); env.update(HOME=str(home),STILLMAC_DOWNLOAD_BASE=assets.as_uri(),PATH=str(hostile)+':'+os.environ['PATH'])
+   env=os.environ.copy(); env.update(HOME=str(home),STILLMAC_VERSION='v0.1.0',STILLMAC_DOWNLOAD_BASE=assets.as_uri(),PATH=str(hostile)+':'+os.environ['PATH'])
    r=run([str(activated)],env=env)
    self.assertEqual(r.returncode,0,r.stderr)
    self.assertFalse(marker.exists())
@@ -165,7 +198,7 @@ class DistributionTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d: r,b=self.installer(d); self.assertEqual(r.returncode,0); r,_=self.installer(d); self.assertEqual(r.returncode,0)
  def test_installer_checksum_mismatch(self):
   with tempfile.TemporaryDirectory() as d:
-   p=pathlib.Path(d); (p/'assets').mkdir(); pkg(p/'assets'); (p/'assets/SHA256SUMS').write_text('0'*64+'  bad.tar.gz\n'+'0'*64+'  other.tar.gz\n'); r,b=self.installer(d); self.assertNotEqual(r.returncode,0); self.assertFalse((b/'stillmac').exists())
+   p=pathlib.Path(d); (p/'assets').mkdir(); pkg(p/'assets'); (p/'assets/SHA256SUMS').write_text('0'*64+'  bad.tar.gz\n'); r,b=self.installer(d); self.assertNotEqual(r.returncode,0); self.assertFalse((b/'stillmac').exists())
  def test_installer_manifest_pin_rejects_forged_archive_and_manifest(self):
   with tempfile.TemporaryDirectory() as d:
    p=pathlib.Path(d); r,b=self.installer(d,mutate=lambda p,b,a:self._forge_assets(a)); self.assertNotEqual(r.returncode,0); self.assertFalse((b/'stillmac').exists())
@@ -176,7 +209,7 @@ class DistributionTests(unittest.TestCase):
   lines=(assets/'SHA256SUMS').read_text().splitlines(); lines[0]=sha(archive)+'  '+archive.name; (assets/'SHA256SUMS').write_text('\n'.join(lines)+'\n')
  def test_installer_missing_manifest_entry(self):
   with tempfile.TemporaryDirectory() as d:
-   p=pathlib.Path(d); (p/'assets').mkdir(); pkg(p/'assets'); lines=(p/'assets/SHA256SUMS').read_text().splitlines(); (p/'assets/SHA256SUMS').write_text(lines[0]+'\n'); r,_=self.installer(d); self.assertNotEqual(r.returncode,0)
+   p=pathlib.Path(d); (p/'assets').mkdir(); pkg(p/'assets'); (p/'assets/SHA256SUMS').write_text(''); r,_=self.installer(d); self.assertNotEqual(r.returncode,0)
  def test_installer_unexpected_manifest_line(self):
   with tempfile.TemporaryDirectory() as d:
    p=pathlib.Path(d); (p/'assets').mkdir(); pkg(p/'assets'); (p/'assets/SHA256SUMS').write_text((p/'assets/SHA256SUMS').read_text()+'\n'+'0'*64+'  extra.tar.gz\n'); r,_=self.installer(d); self.assertNotEqual(r.returncode,0)
@@ -223,12 +256,11 @@ class DistributionTests(unittest.TestCase):
     (b/'stillmac').write_bytes(old); bad=a/'stillmac-v0.1.0-darwin-arm64.tar.gz'
     with tarfile.open(bad,'w:gz') as t:
      payload=b'#!/bin/sh\nexit 23\n'; i=tarfile.TarInfo('stillmac'); i.mode=0o755; i.size=len(payload); t.addfile(i,io.BytesIO(payload))
-    (a/'SHA256SUMS').write_text(sha(bad)+'  '+bad.name+'\n'+'0'*64+'  stillmac-v0.1.0-darwin-amd64.tar.gz\n')
+    (a/'SHA256SUMS').write_text(sha(bad)+'  '+bad.name+'\n')
    r,b=self.installer(d,mutate=mutate); self.assertNotEqual(r.returncode,0); self.assertEqual((b/'stillmac').read_bytes(),old); self.assertEqual(list(b.glob('.stillmac.*')),[])
- def test_installer_selects_amd64(self):
+ def test_installer_rejects_intel(self):
   with tempfile.TemporaryDirectory() as d:
-   p=pathlib.Path(d); assets=p/'assets'; assets.mkdir(); installer_pkg(assets); (assets/'stillmac-v0.1.0-darwin-arm64.tar.gz').unlink()
-   r,b=self.installer(d,mutate=lambda p,b,a:(p/'fakebin/uname').write_text('#!/bin/sh\ncase "$1" in -s) echo Darwin;; -m) echo x86_64;; esac\n')); self.assertEqual(r.returncode,0,r.stderr); self.assertTrue((b/'stillmac').exists())
+   r,b=self.installer(d,mutate=lambda p,b,a:(p/'fakebin/uname').write_text('#!/bin/sh\ncase "$1" in -s) echo Darwin;; -m) echo x86_64;; esac\n')); self.assertNotEqual(r.returncode,0); self.assertFalse((b/'stillmac').exists())
  def test_installer_no_data_root_on_failure(self):
   with tempfile.TemporaryDirectory() as d:
    r,_=self.installer(d,mutate=lambda p,b,a:(a/'SHA256SUMS').write_text('bad\n')); self.assertNotEqual(r.returncode,0); self.assertFalse((pathlib.Path(d)/'home/Library').exists())
@@ -260,38 +292,55 @@ class DistributionTests(unittest.TestCase):
  def test_formula_template_not_installable(self): self.assertFalse((ROOT/'Formula/stillmac.rb').exists()); self.assertIn('@VERSION@',(ROOT/'Formula/stillmac.rb.tmpl').read_text())
  def test_formula_generation_and_ruby_syntax(self):
   with tempfile.TemporaryDirectory() as d:
-   p=pathlib.Path(d); pkg(p); out=p/'f.rb'; r=run([str(SCRIPTS/'update-formula.sh'),'v0.1.0',str(p),str(out)]); self.assertEqual(r.returncode,0,r.stderr); self.assertEqual(run(['ruby','-c',str(out)]).returncode,0); text=out.read_text(); m={line.split()[1]:line.split()[0] for line in (p/'SHA256SUMS').read_text().splitlines()}; self.assertIn('version "0.1.0"',text); self.assertIn(m['stillmac-v0.1.0-darwin-arm64.tar.gz'],text); self.assertIn(m['stillmac-v0.1.0-darwin-amd64.tar.gz'],text)
+   p=pathlib.Path(d); pkg(p); out=p/'f.rb'; r=run([str(SCRIPTS/'update-formula.sh'),'v0.1.0',str(p),str(out)]); self.assertEqual(r.returncode,0,r.stderr); self.assertEqual(run(['ruby','-c',str(out)]).returncode,0); text=out.read_text(); m={line.split()[1]:line.split()[0] for line in (p/'SHA256SUMS').read_text().splitlines()}; self.assertIn('version "0.1.0"',text); self.assertIn(m['stillmac-v0.1.0-darwin-arm64.tar.gz'],text); self.assertNotIn('on_intel',text)
  def test_formula_rejects_extra_manifest(self):
   with tempfile.TemporaryDirectory() as d:
    p=pathlib.Path(d); pkg(p); (p/'SHA256SUMS').write_text((p/'SHA256SUMS').read_text()+'0'*64+'  extra\n'); self.assertNotEqual(run([str(SCRIPTS/'update-formula.sh'),'v0.1.0',str(p),str(p/'f')]).returncode,0)
  def test_docs_remove_purge_claims(self):
   for n in ('README.md','INSTALL.md','UNINSTALL.md','docs/DISTRIBUTION-CONTRACT.md','skills/stillmac/SKILL.md'): self.assertNotIn('--purge-data',(ROOT/n).read_text())
- def test_readme_documents_only_real_cli_commands_and_inactive_install_routes(self):
+ def test_install_docs_match_public_v011_apple_silicon_release(self):
+  install=(ROOT/'INSTALL.md').read_text()
+  contract=(ROOT/'docs/DISTRIBUTION-CONTRACT.md').read_text()
+  for text in (install,contract): self.assertIn('Apple Silicon',text)
+  self.assertIn('/releases/download/v0.1.1/stillmac-install-v0.1.1.sh',install)
+  self.assertIn('## Inspect first',install)
+  self.assertIn('Homebrew, INACTIVE',install)
+  self.assertIn('Agent Skill, INACTIVE',install)
+  self.assertNotIn('darwin-amd64',contract)
+ def test_release_checklist_gates_private_prerelease_before_visibility(self):
+  text=(ROOT/'docs/RELEASE-CHECKLIST.md').read_text().lower()
+  self.assertIn('v0.1.0',text)
+  self.assertIn('draft',text)
+ def test_readme_is_a_simple_public_beta_front_page(self):
   text=(ROOT/'README.md').read_text()
-  for command in ('stillmac doctor','stillmac sample','stillmac status','stillmac report','stillmac scan','stillmac explain','stillmac plan','stillmac apply','stillmac clean','stillmac protect','stillmac history','stillmac help'):
+  for heading in ('## What StillMac does','## Current status','## Install','## Build from source','## Start with a read-only scan','## Review, plan, approve, apply','## Privacy','## Detailed documentation'):
+   self.assertIn(heading,text)
+  for command in ('go build -buildvcs=false -trimpath','./bin/stillmac doctor','./bin/stillmac scan --format text','./bin/stillmac explain','./bin/stillmac plan','./bin/stillmac apply'):
    self.assertIn(command,text)
-  self.assertIn('There is no `stillmac learn` command',text)
-  self.assertIn('curl -fsSL https://github.com/HYPHNLabs/StillMac/releases/download/v0.1.0/stillmac-install-v0.1.0.sh | sh',text)
-  self.assertNotIn('vX.Y.Z',text)
-  for step in ('Scan now','Review numbered candidates','Select IDs or all-safe','Preview 15-minute plan','Approve exact plan','Revalidate','Clean verified Go cache','Receipt + history'):
-   self.assertIn(step,text)
-  self.assertIn('brew install HYPHNLabs/tap/stillmac',text)
-  self.assertIn('npx skills add HYPHNLabs/StillMac -g',text)
-  self.assertGreaterEqual(text.count('INACTIVE'),3)
-  self.assertIn('inspect the downloaded script',text)
-  self.assertLess(text.index('## Installation routes'),text.index('## Working commands'))
-  brew=text.index('```bash\nbrew install HYPHNLabs/tap/stillmac\n```')
-  skill=text.index('```bash\nnpx skills add HYPHNLabs/StillMac -g\n```')
-  self.assertLess(brew,skill)
- def test_readme_describes_current_cleanup_without_false_reclaim_or_git_action(self):
+  self.assertIn("StillMac's first public beta release is `v0.1.1`.",text)
+  self.assertIn('Apple Silicon Macs only',text)
+  self.assertIn('curl -fsSL https://github.com/HYPHNLabs/StillMac/releases/download/v0.1.1/stillmac-install-v0.1.1.sh | sh',text)
+  self.assertNotIn('brew install HYPHNLabs/tap/stillmac',text)
+  self.assertNotIn('npx skills add HYPHNLabs/StillMac -g',text)
+ def test_public_scope_ownership_and_security_route_are_explicit(self):
+  self.assertNotIn('amd64',(SCRIPTS/'package.sh').read_text())
+  self.assertNotIn('x86_64',(SCRIPTS/'install.sh.tmpl').read_text())
+  self.assertIn('contact@hyphnlabs.com',(ROOT/'SECURITY.md').read_text())
+  self.assertNotIn('Distribution remains inactive.',(ROOT/'THREAT-MODEL.md').read_text())
+  self.assertNotIn('inactive release installer template',(ROOT/'PRIVACY.md').read_text())
+  self.assertIn('Copyright 2026 HYPHN Labs',(ROOT/'NOTICE').read_text())
+  self.assertNotIn('precise citation',(ROOT/'ACKNOWLEDGEMENTS.md').read_text().lower())
+ def test_readme_describes_current_cleanup_boundary_and_approval_flow(self):
   text=(ROOT/'README.md').read_text()
-  for label in ('SAFE','REVIEW','BLOCKED_ACTIVE','BLOCKED_DIRTY','BLOCKED_UNMERGED','BLOCKED_UNKNOWN','BLOCKED_CHANGED','PROTECTED'):
-   self.assertIn(label,text)
-  self.assertIn('owner-native-go-clean-cache',text)
-  self.assertIn('actually frees measured cache bytes',text)
-  self.assertIn('Homebrew is always `REVIEW` with action `none`',text)
-  self.assertIn('Git worktrees are inventory-only',text)
-  self.assertNotIn('cleanup is not enabled',text.lower())
+  for claim in ('exact Go build cache','Homebrew caches, Codex runtimes, and Git worktrees','inventory-only','15 minutes','explicit approval','revalidation','receipt'):
+   self.assertIn(claim,text)
+  self.assertIn('go clean -cache',text)
+  self.assertIn('No telemetry',text)
+  self.assertIn('Local',text)
+  self.assertIn('Process and memory samples exclude command arguments, environment variables, full executable paths',text)
+  self.assertIn('Cleanup private state retains the exact action target, host binding, protection and plan records, receipts, and verified Go executable identity required to revalidate an approved plan.',text)
+  self.assertIn('Public output excludes the private target paths and executable identity.',text)
+  self.assertNotIn('No collection of command arguments, environment variables, full executable paths',text)
  def test_cleanup_contract_and_skill_enforce_approval_flow(self):
   contract=(ROOT/'docs/DEVELOPER-CLEANUP-CONTRACT.md').read_text()
   skill=(ROOT/'skills/stillmac/SKILL.md').read_text()

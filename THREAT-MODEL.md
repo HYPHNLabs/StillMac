@@ -2,7 +2,7 @@
 
 ## Scope
 
-This model covers baseline commands and the developer cleanup commands `scan`, `explain`, `plan`, `apply`, `clean`, `protect`, and `history`. Distribution remains inactive.
+This model covers baseline commands, the developer cleanup commands `scan`, `explain`, `plan`, `apply`, `clean`, `protect`, and `history`, and the direct `v0.1.1` GitHub Release installer. Homebrew and Agent Skill distribution remain inactive.
 
 ## Protected assets
 
@@ -51,7 +51,7 @@ Each attempted row gets an atomic receipt with success or failure. Apply returns
 
 ### Supply chain
 
-The source installer fails closed. Curl, Homebrew, and npx routes are inactive. Local packaging tests do not establish a public release, signing, notarisation, provenance, or compatibility.
+The source installer fails closed. The direct release installer is pinned to the reviewed `v0.1.1` manifest digest and verifies the Apple Silicon archive before installation. Homebrew and Agent Skill routes remain inactive. Signing and notarisation are not claimed.
 
 ## Residual risks
 
@@ -59,6 +59,6 @@ The source installer fails closed. Curl, Homebrew, and npx routes are inactive. 
 - Malicious same-UID concurrent replacement of the Go executable or logical GOCACHE pathname is out of scope and can race the final checks, `execve`, or Go pathname resolution. Fixed absolute executable selection, fingerprints, exact GOCACHE, fixed arguments, and sanitized environment are defense-in-depth, not an atomic guarantee. No cache source-name rename remains.
 - Go cache cleaning can increase the cost of later builds while cache entries are rebuilt.
 - Git reachability is evaluated against local `main`; stale refs can make inventory conservative or incomplete.
-- macOS 14 and Intel runtime support are not verified.
+- The public beta is Apple Silicon only and has been executed on macOS 26.5. Other macOS versions are not yet verified runtime claims.
 
 Future end-session automation may scan only. Auto-clean, scheduler state, new roots, or network behaviour requires a new contract and threat review.

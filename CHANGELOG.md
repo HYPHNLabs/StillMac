@@ -1,8 +1,6 @@
 # Changelog
 
-StillMac has not published a release.
-
-## Unreleased
+## v0.1.1 - 2026-08-20
 
 ### Added
 
@@ -22,4 +20,7 @@ StillMac has not published a release.
 
 ### Distribution
 
-- Direct curl, Homebrew, and npx routes remain inactive and are documented as such.
+- Added the pinned GitHub Release installer for Apple Silicon.
+- Added deterministic Apple Silicon archive and SHA-256 manifest generation.
+- Added temporary-HOME install, repeat-install, rollback, read-only smoke, and keep-data uninstall verification.
+- Homebrew and npx routes remain inactive and are documented as such.

@@ -12,7 +12,7 @@ metadata:
 
 Use the installed `stillmac` binary. Never invent paths, candidate IDs, plan IDs, cache rules, shell deletion commands, Git cleanup commands, or host facts. Do not interpret `SAFE` as permission. Only a verified Go build cache row can be executable. Homebrew, Codex, and Git rows are inventory only.
 
-Public installation routes are inactive. Do not tell the user that curl, Homebrew, npx, a release, signing, notarisation, or Intel support works.
+The direct `v0.1.1` GitHub Release installer supports Apple Silicon only. Homebrew, npx, signing, notarisation, and Intel support remain inactive; do not claim they work.
 
 ## Conversational cleanup flow
 

@@ -24,16 +24,15 @@ go test -count=1 -race ./...
 go vet ./...
 ```
 
-## Cross-build
+## Release build
 
-Cross-building proves compilation, not runtime compatibility:
+The public beta release target is Apple Silicon:
 
 ```bash
 GOOS=darwin GOARCH=arm64 go build -buildvcs=false -trimpath -o /tmp/stillmac-darwin-arm64 ./cmd/stillmac
-GOOS=darwin GOARCH=amd64 go build -buildvcs=false -trimpath -o /tmp/stillmac-darwin-amd64 ./cmd/stillmac
 ```
 
-Do not claim Intel support until the `amd64` artifact has been executed and tested on Intel hardware or an approved equivalent environment.
+Do not publish or claim Intel support from a cross-build. Intel is outside the current public beta scope.
 
 ## Privacy inspection
 

@@ -2,11 +2,11 @@
 
 ## Supported versions
 
-StillMac has no published supported release. The repository is a pre-release candidate.
+Security fixes are provided for the latest public beta. The current supported beta is `v0.1.1` for Apple Silicon Macs.
 
 ## Reporting
 
-Do not put a vulnerability or real private data in a public issue. If GitHub Private Vulnerability Reporting becomes available, use it. Otherwise contact the repository owner through an owner-controlled private route. Include the affected command and revision, preconditions, impact, and a synthetic reproduction.
+Do not put a vulnerability or real private data in a public issue. Use GitHub Private Vulnerability Reporting from the repository Security tab. If that route is unavailable, email `contact@hyphnlabs.com` with the subject `StillMac security report`. Include the affected command and revision, preconditions, impact, and a synthetic reproduction.
 
 ## Runtime boundary
 
