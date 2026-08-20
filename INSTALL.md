@@ -1,6 +1,6 @@
 # Install
 
-StillMac `v0.1.1` is the first public beta. It supports Apple Silicon Macs only and has been executed on macOS 26.5.
+StillMac's first public beta release is `v0.1.1`. It supports Apple Silicon Macs only and has been executed on macOS 26.5.
 
 ## Direct installer
 
@@ -8,7 +8,7 @@ StillMac `v0.1.1` is the first public beta. It supports Apple Silicon Macs only 
 curl -fsSL https://github.com/HYPHNLabs/StillMac/releases/download/v0.1.1/stillmac-install-v0.1.1.sh | sh
 ```
 
-The installer embeds the reviewed SHA-256 digest of the exact `v0.1.1` manifest. It verifies the manifest and Apple Silicon archive, rejects unsafe archive members, stages `doctor` in temporary data, installs per-user at `$HOME/.local/bin/stillmac` without `sudo`, and preserves an existing binary if verification fails.
+The installer embeds the reviewed SHA-256 digest of the exact `v0.1.1` manifest. It verifies the manifest and Apple Silicon archive, rejects unsafe archive members, stages `doctor` in temporary data, installs per-user at `$HOME/.local/bin/stillmac` without `sudo`, and preserves an existing binary if verification fails. This route is usable only while the exact versioned GitHub Release assets are available; a missing or mismatched asset fails closed.
 
 ## Inspect first
 

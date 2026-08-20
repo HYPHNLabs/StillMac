@@ -317,7 +317,7 @@ class DistributionTests(unittest.TestCase):
    self.assertIn(heading,text)
   for command in ('go build -buildvcs=false -trimpath','./bin/stillmac doctor','./bin/stillmac scan --format text','./bin/stillmac explain','./bin/stillmac plan','./bin/stillmac apply'):
    self.assertIn(command,text)
-  self.assertIn('StillMac `v0.1.1` is the first public beta.',text)
+  self.assertIn("StillMac's first public beta release is `v0.1.1`.",text)
   self.assertIn('Apple Silicon Macs only',text)
   self.assertIn('curl -fsSL https://github.com/HYPHNLabs/StillMac/releases/download/v0.1.1/stillmac-install-v0.1.1.sh | sh',text)
   self.assertNotIn('brew install HYPHNLabs/tap/stillmac',text)
@@ -326,6 +326,8 @@ class DistributionTests(unittest.TestCase):
   self.assertNotIn('amd64',(SCRIPTS/'package.sh').read_text())
   self.assertNotIn('x86_64',(SCRIPTS/'install.sh.tmpl').read_text())
   self.assertIn('contact@hyphnlabs.com',(ROOT/'SECURITY.md').read_text())
+  self.assertNotIn('Distribution remains inactive.',(ROOT/'THREAT-MODEL.md').read_text())
+  self.assertNotIn('inactive release installer template',(ROOT/'PRIVACY.md').read_text())
   self.assertIn('Copyright 2026 HYPHN Labs',(ROOT/'NOTICE').read_text())
   self.assertNotIn('precise citation',(ROOT/'ACKNOWLEDGEMENTS.md').read_text().lower())
  def test_readme_describes_current_cleanup_boundary_and_approval_flow(self):

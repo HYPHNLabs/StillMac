@@ -21,7 +21,7 @@ StillMac does **not** delete Homebrew caches, Codex runtimes, or Git worktrees. 
 
 ## Current status
 
-StillMac `v0.1.1` is the first public beta. It supports **Apple Silicon Macs only** and has been executed on macOS 26.5. Other macOS versions are not yet verified runtime claims.
+StillMac's first public beta release is `v0.1.1`. It supports **Apple Silicon Macs only** and has been executed on macOS 26.5. Other macOS versions are not yet verified runtime claims.
 
 Homebrew and Agent Skill distribution remain inactive. See [INSTALL.md](INSTALL.md) for the exact lifecycle and inspect-first route.
 
@@ -31,7 +31,7 @@ Homebrew and Agent Skill distribution remain inactive. See [INSTALL.md](INSTALL.
 curl -fsSL https://github.com/HYPHNLabs/StillMac/releases/download/v0.1.1/stillmac-install-v0.1.1.sh | sh
 ```
 
-The installer is pinned to the `v0.1.1` manifest, verifies the archive checksum, installs per-user without `sudo`, and runs `doctor` before replacing an existing binary.
+The installer is pinned to the `v0.1.1` manifest, verifies the archive checksum, installs per-user without `sudo`, and runs `doctor` before replacing an existing binary. The command is usable only when that exact versioned GitHub Release asset is available; otherwise it fails closed.
 
 Inspect first:
 

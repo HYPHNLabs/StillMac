@@ -2,7 +2,7 @@
 
 ## Scope
 
-This model covers baseline commands and the developer cleanup commands `scan`, `explain`, `plan`, `apply`, `clean`, `protect`, and `history`. Distribution remains inactive.
+This model covers baseline commands, the developer cleanup commands `scan`, `explain`, `plan`, `apply`, `clean`, `protect`, and `history`, and the direct `v0.1.1` GitHub Release installer. Homebrew and Agent Skill distribution remain inactive.
 
 ## Protected assets
 
@@ -51,7 +51,7 @@ Each attempted row gets an atomic receipt with success or failure. Apply returns
 
 ### Supply chain
 
-The source installer fails closed. Curl, Homebrew, and npx routes are inactive. Local packaging tests do not establish a public release, signing, notarisation, provenance, or compatibility.
+The source installer fails closed. The direct release installer is pinned to the reviewed `v0.1.1` manifest digest and verifies the Apple Silicon archive before installation. Homebrew and Agent Skill routes remain inactive. Signing and notarisation are not claimed.
 
 ## Residual risks
 

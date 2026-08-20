@@ -2,7 +2,7 @@
 
 ## Summary
 
-The StillMac Go binary is local and has no network client, telemetry, analytics, cloud service, or LLM dependency. The inactive release installer template is a separate distribution surface. Cleanup inventory and state are path-minimised and private.
+The StillMac Go binary is local and has no network client, telemetry, analytics, cloud service, or LLM dependency. The direct `v0.1.1` release installer is a separate networked distribution surface that downloads the pinned manifest and Apple Silicon archive from GitHub Releases. Cleanup inventory and state are path-minimised and private.
 
 ## Process and memory observations
 
