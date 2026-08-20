@@ -11,7 +11,7 @@ WORK=$(mktemp -d "${TMPDIR:-/tmp}/stillmac-package.XXXXXXXX") || exit 1
 case "$WORK" in /*) ;; *) exit 1;; esac
 cleanup(){ rm -rf -- "$WORK"; }
 trap cleanup EXIT INT TERM
-for arch in arm64 amd64; do
+for arch in arm64; do
   bin="$WORK/stillmac-$arch"
   (cd "$ROOT" && GOOS=darwin GOARCH=$arch CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags='-s -w' -o "$bin" ./cmd/stillmac)
   chmod 755 "$bin"
@@ -27,4 +27,4 @@ with open(dst, 'wb') as raw:
       with open(src,'rb') as f: t.addfile(i,f)
 PY
 done
-(cd "$OUT" && shasum -a 256 "stillmac-$VERSION-darwin-arm64.tar.gz" "stillmac-$VERSION-darwin-amd64.tar.gz" > SHA256SUMS)
+(cd "$OUT" && shasum -a 256 "stillmac-$VERSION-darwin-arm64.tar.gz" > SHA256SUMS)

@@ -10,12 +10,12 @@ This is directional, not a release promise.
 - Non-executable Codex runtime inventory.
 - No scheduler, network client, telemetry, process action, direct filesystem cleanup, or unmeasured free-space claim.
 
-## Before any release
+## Public beta closure
 
-- Complete independent security and specification review.
-- Pass full macOS architecture and claimed-version execution evidence.
-- Confirm legal rights holder, private reporting route, signing, notarisation, checksums, provenance, and clean-account installation.
-- Activate immutable release assets, installer, Homebrew formula, and Agent Skill separately. Until then every route is inactive.
+- Keep independent security and specification review current for each release candidate.
+- Expand macOS version evidence without broadening beyond Apple Silicon by implication.
+- Add signing and notarisation when the support burden justifies the Apple developer workflow; do not claim them before activation.
+- Evaluate Homebrew and Agent Skill publication as separate routes after the direct installer stabilises.
 
 ## Later contracts
 

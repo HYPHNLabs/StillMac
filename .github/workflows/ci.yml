@@ -25,13 +25,12 @@ jobs:
         run: go vet ./...
       - name: Build current runner
         run: go build -buildvcs=false -trimpath -o /tmp/stillmac ./cmd/stillmac
-      - name: Cross-build Darwin targets
+      - name: Build Apple Silicon release target
         run: |
           GOOS=darwin GOARCH=arm64 go build -buildvcs=false -trimpath -o /tmp/stillmac-darwin-arm64 ./cmd/stillmac
-          GOOS=darwin GOARCH=amd64 go build -buildvcs=false -trimpath -o /tmp/stillmac-darwin-amd64 ./cmd/stillmac
       - name: Reject runner workspace paths in binaries
         run: |
-          for artifact in /tmp/stillmac /tmp/stillmac-darwin-arm64 /tmp/stillmac-darwin-amd64; do
+          for artifact in /tmp/stillmac /tmp/stillmac-darwin-arm64; do
             if strings "$artifact" | grep -F "$GITHUB_WORKSPACE"; then
               echo "build path leaked into $artifact" >&2
               exit 1
@@ -49,7 +48,6 @@ jobs:
           sh scripts/package.sh v0.1.0 "$d2"
           cmp "$d1/SHA256SUMS" "$d2/SHA256SUMS"
           cmp "$d1/stillmac-v0.1.0-darwin-arm64.tar.gz" "$d2/stillmac-v0.1.0-darwin-arm64.tar.gz"
-          cmp "$d1/stillmac-v0.1.0-darwin-amd64.tar.gz" "$d2/stillmac-v0.1.0-darwin-amd64.tar.gz"
           sh scripts/update-formula.sh v0.1.0 "$d1" /tmp/stillmac.rb
           ruby -c /tmp/stillmac.rb
           (cd "$d1" && shasum -a 256 -c SHA256SUMS)

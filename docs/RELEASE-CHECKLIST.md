@@ -1,46 +1,47 @@
 # Release Checklist
 
-## Current decision boundary
+## Decision boundary
 
-This repository may be prepared and committed locally. No remote, push, tag, release, or publication is authorised by this checklist.
+StillMac is approved as HYPHN Labs' first public beta. Public scope is Apple Silicon only. The superseded private `v0.1.0` rehearsal release has been returned to draft and is not a public installation route. `v0.1.1` is the approved publication candidate.
 
-## Private repository gate
+## Evidence already completed
 
-- [ ] Bounded 12-hour beta soak completed without failure.
-- [ ] Full race tests, vet, and trimpath build passed after the final source change.
-- [ ] Darwin `arm64` and `amd64` cross-builds passed.
-- [ ] Real-host `doctor`, `sample`, `status`, and both report formats passed.
-- [ ] Source, tracked-file list, generated state/reports, and binary passed privacy/residue scans.
-- [ ] Private PRDs, local build output, and runtime state are absent from Git history.
-- [ ] Independent specification review passed.
-- [ ] Independent security/code-quality review passed.
-- [ ] Repository owner, name, and private visibility approved.
-- [ ] Commit identity and recovery controls approved.
-
-## Public beta gate
-
-- [ ] Legal rights holder confirmed.
+- [x] Bounded 12-hour beta soak completed: 25/25 samples over 12 hours 1 minute 55 seconds.
+- [x] Seven-day observe-only learning completed: 336/336 scheduled runs and 337 recorded samples; review completed.
+- [x] Local process/memory and cleanup contracts independently reviewed during development.
+- [x] Repository owner and name established as `HYPHNLabs/StillMac`.
 - [x] Apache License 2.0 approved and added.
-- [ ] Exact inspiration/third-party attribution confirmed.
-- [ ] Security disclosure route is operational.
-- [ ] Claimed macOS/architecture matrix executed in CI or on real hosts.
-- [ ] Tagged artifacts, SHA-256 manifest, and provenance generated and verified.
-- [ ] For a private release rehearsal only: build with `-buildvcs=false -trimpath`, package, then run `scripts/activate-installer.sh` after reviewing the exact manifest; this does not publish or activate checked-in scripts.
-- [x] Local clean-account installer/uninstaller fixtures and rollback behavior are tested; remote release activation remains pending.
-- [ ] README claims match executed evidence.
-- [ ] Explicit public publication approval recorded.
+- [x] HYPHN Labs confirmed as code and brand rights holder.
+- [x] Provenance reviewed: one repository contributor, no copied prototype source, Go standard library only, no third-party runtime dependencies.
+- [x] Security fallback route established at `contact@hyphnlabs.com`; GitHub Private Vulnerability Reporting must be enabled immediately after public visibility permits it.
+- [x] Public compatibility narrowed to Apple Silicon only; executed on macOS 26.5. Intel is not claimed or distributed.
+- [x] Superseded `v0.1.0` prerelease returned to draft before visibility change.
+- [x] Local installer/uninstaller fixtures, manifest pinning, unsafe archive rejection, rollback, and keep-data behavior tested.
 
-## Promotion gate
+## Exact `v0.1.1` candidate gate
 
-- [ ] Public artifact installation re-verified.
-- [ ] Issue and security routes verified.
-- [ ] Launch copy reviewed for unsupported performance, safety, or compatibility claims.
-- [ ] Explicit promotion approval recorded.
+- [x] Full race tests, vet, formatting, and trimpath build pass after the final source change.
+- [x] Real-host `doctor`, `sample`, `status`, scan, plan preview, and report formats pass without performing cleanup.
+- [x] Source, tracked history, generated state/reports, and final binary pass privacy/residue scans.
+- [x] Apple Silicon archive builds twice byte-for-byte identically.
+- [ ] Final `SHA256SUMS`, installer, and `PROVENANCE.json` are generated from the committed `main` revision.
+- [x] Fresh temporary-HOME install, repeat install, read-only smoke, and uninstall pass using the deterministic candidate assets; repeat against downloaded release assets before visibility change.
+- [ ] Independent final specification and security review passes against the exact diff and artifacts.
+- [ ] Remote CI passes on the final committed revision.
+- [ ] Final release assets are downloaded back and match local SHA-256 values.
+- [ ] README and INSTALL commands match the published `v0.1.1` assets.
 
-## Current known blockers
+## Public visibility gate
 
-- Apache-2.0 is selected; legal confirmation of code and brand ownership remains a public-release gate.
-- No published release, Homebrew tap, or npx activation. Local installer/uninstaller scripts are present and separately verified.
-- No Intel runtime evidence.
-- macOS 14 is a target, not an executed support claim.
-- The seven-day product observation window has not been completed by the release-candidate soak.
+- [ ] Repository visibility changed to public only after the exact candidate gate passes.
+- [ ] Anonymous repository, release, archive, manifest, installer, and source links return successfully.
+- [ ] GitHub Private Vulnerability Reporting enabled and verified.
+- [ ] Public branch protection and security settings verified.
+- [ ] Public pinned installer command succeeds under a fresh temporary HOME.
+
+## Deliberately inactive routes
+
+- Homebrew tap: inactive.
+- Agent Skill/npx distribution: inactive.
+- Intel binaries: not distributed.
+- Signing/notarisation: not claimed.

@@ -46,6 +46,7 @@ def main(argv):
             return fail("output parent is unsafe")
         output_fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o755, dir_fd=parent_fd)
         created = True
+        os.fchmod(output_fd, 0o755)
         view = memoryview(data)
         while view:
             view = view[os.write(output_fd, view):]

@@ -8,7 +8,7 @@ StillMac is a narrow baseline and approval-gated developer-cache beta candidate.
 - Read [docs/DEVELOPER-CLEANUP-CONTRACT.md](docs/DEVELOPER-CLEANUP-CONTRACT.md) for cleanup work.
 - Keep changes inside one of those current contracts.
 - Do not add network access, telemetry, scheduling, runtime installation, recursive deletion, new cleanup roots, process control, port collection, or LLM dependencies without a separately approved contract.
-- Do not add licence or copyright-holder claims until ownership is formally decided.
+- HYPHN Labs owns and licenses the repository under Apache-2.0. New contributions must be original or carry compatible, documented provenance.
 
 ## Engineering rules
 

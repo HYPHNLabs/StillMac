@@ -20,4 +20,4 @@ The StillMac mark combines a continuous `S` observation path with three sample n
 
 Generated with OpenAI ImageGen on 12 August 2026 from a StillMac-specific creative brief. The brief requested an original macOS utility identity and explicitly excluded Apple marks and generic cleaner or AI imagery. The horizontal lockup was generated from the approved icon source with the exact `StillMac` wordmark.
 
-The repository's source-code and documentation licence is Apache-2.0. Apache-2.0 does not grant general trademark rights in the StillMac name or brand assets. Confirm legal ownership before public distribution.
+HYPHN Labs owns the StillMac name and brand assets. The repository's source code and documentation are licensed under Apache-2.0; that licence does not grant general trademark rights in the StillMac name or brand assets.

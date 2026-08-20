@@ -33,7 +33,7 @@ secure_component() {
     case "$mode" in *[!0-9]*|'') return 1 ;; esac
     [ "$((mode % 100))" -eq 0 ] || return 1
 }
-VERSION=${STILLMAC_VERSION:-v0.1.0}; OWNER_REPO=${STILLMAC_REPO:-HYPHNLabs/StillMac}
+VERSION=${STILLMAC_VERSION:-v0.1.1}; OWNER_REPO=${STILLMAC_REPO:-HYPHNLabs/StillMac}
 BASE=${STILLMAC_DOWNLOAD_BASE:-"https://github.com/$OWNER_REPO/releases/download/$VERSION"}
 TRUSTED_MANIFEST_SHA256='@TRUSTED_MANIFEST_SHA256@'
 fail(){ printf '%s\n' "StillMac installer: $*" >&2; exit 1; }
@@ -42,7 +42,8 @@ case "$TRUSTED_MANIFEST_SHA256" in
   *) fail 'installer is not release-activated' ;;
 esac
 [ "$(uname -s)" = Darwin ] || fail 'StillMac supports macOS only'
-case "$(uname -m)" in arm64) target=arm64;; x86_64) target=amd64;; *) fail 'unsupported macOS architecture';; esac
+[ "$(uname -m)" = arm64 ] || fail 'StillMac public beta supports Apple Silicon only'
+target=arm64
 [ "$(id -u)" -ne 0 ] || fail 'do not run installer as root or sudo'
 validate_version "$VERSION" || fail 'invalid version'
 case "$HOME" in /*) ;; *) fail 'HOME must be absolute';; esac
@@ -58,7 +59,7 @@ curl --fail --location --silent --show-error "$BASE/$archive_name" -o "$archive"
 curl --fail --location --silent --show-error "$BASE/SHA256SUMS" -o "$manifest" || fail 'manifest download failed'
 manifest_actual=$(shasum -a 256 "$manifest" | awk '{print $1}')
 [ "$manifest_actual" = "$TRUSTED_MANIFEST_SHA256" ] || fail 'release manifest pin mismatch'
-expected=$(awk -v version="$VERSION" -v name="$archive_name" 'BEGIN{n=0;found=0;bad=0}{if(NF!=2){bad=1;next};h=$1;f=$2;if(h !~ /^[0-9A-Fa-f][0-9A-Fa-f]*$/ || length(h)!=64 || f !~ /^\*?[A-Za-z0-9._-]+$/){bad=1};n++;if(f==name||f=="*"name){found++;hash=h}}END{if(bad||n!=2||found!=1)exit 1;print hash}' "$manifest") || fail 'manifest is malformed'
+expected=$(awk -v version="$VERSION" -v name="$archive_name" 'BEGIN{n=0;found=0;bad=0}{if(NF!=2){bad=1;next};h=$1;f=$2;if(h !~ /^[0-9A-Fa-f][0-9A-Fa-f]*$/ || length(h)!=64 || f !~ /^\*?[A-Za-z0-9._-]+$/){bad=1};n++;if(f==name||f=="*"name){found++;hash=h}}END{if(bad||n!=1||found!=1)exit 1;print hash}' "$manifest") || fail 'manifest is malformed'
 actual=$(shasum -a 256 "$archive" | awk '{print $1}'); [ "$actual" = "$expected" ] || fail 'archive checksum mismatch'
 stage="$TMP/stage"; mkdir "$stage"; LC_ALL=C tar -tvzf "$archive" > "$TMP/list" || fail 'cannot inspect archive'
 awk 'BEGIN{n=0;bad=0}{n++;if($1!~/^-/||$NF!="stillmac"||$0~/[[:space:]]link to[[:space:]]/)bad=1}END{if(bad||n!=1)exit 1}' "$TMP/list" || fail 'unsafe archive member type or set'
