@@ -194,6 +194,14 @@ class DistributionTests(unittest.TestCase):
    self.assertTrue((bindir/'stillmac').is_file())
  def test_installer_fresh_install(self):
   with tempfile.TemporaryDirectory() as d: r,b=self.installer(d); self.assertEqual(r.returncode,0,r.stderr); self.assertTrue((b/'stillmac').is_file())
+ def test_installer_prints_explicit_path_setup_without_editing_shell_files(self):
+  with tempfile.TemporaryDirectory() as d:
+   r,b=self.installer(d); home=b.parent.parent
+   self.assertEqual(r.returncode,0,r.stderr)
+   for expected in ('StillMac does not modify shell configuration.','export PATH="$HOME/.local/bin:$PATH"','$HOME/.zprofile','$HOME/.zshrc','stillmac doctor'):
+    self.assertIn(expected,r.stdout)
+   self.assertFalse((home/'.zprofile').exists())
+   self.assertFalse((home/'.zshrc').exists())
  def test_installer_idempotent_update(self):
   with tempfile.TemporaryDirectory() as d: r,b=self.installer(d); self.assertEqual(r.returncode,0); r,_=self.installer(d); self.assertEqual(r.returncode,0)
  def test_installer_checksum_mismatch(self):
@@ -306,6 +314,11 @@ class DistributionTests(unittest.TestCase):
   self.assertIn('## Inspect first',install)
   self.assertIn('Homebrew, INACTIVE',install)
   self.assertIn('Agent Skill, INACTIVE',install)
+  self.assertIn('## Add StillMac to PATH',install)
+  self.assertIn('## Upgrade',install)
+  self.assertIn('## Uninstall',install)
+  self.assertIn('export PATH="$HOME/.local/bin:$PATH"',install)
+  self.assertIn('stillmac doctor',install)
   self.assertNotIn('darwin-amd64',contract)
  def test_release_checklist_gates_private_prerelease_before_visibility(self):
   text=(ROOT/'docs/RELEASE-CHECKLIST.md').read_text().lower()
@@ -313,17 +326,20 @@ class DistributionTests(unittest.TestCase):
   self.assertIn('draft',text)
  def test_readme_is_a_simple_public_beta_front_page(self):
   text=(ROOT/'README.md').read_text()
-  for heading in ('## Who StillMac is for','## Public beta limits','## Install','## Quick start','## Example scan','## What StillMac can change','## Process and memory snapshots','## Advanced and automated use','## Build from source','## Privacy','## Detailed documentation'):
+  for heading in ('## Who StillMac is for','## Public beta limits','## Install','## Quick start','## Command reference','## Example scan','## What StillMac can change','## Process and memory snapshots','## Advanced and automated use','## Upgrade','## Uninstall','## Build from source','## Privacy','## Detailed documentation'):
    self.assertIn(heading,text)
-  installed='$HOME/.local/bin/stillmac'
-  for command in ('go build -buildvcs=false -trimpath',installed+' doctor',installed+' scan --format text',installed+' clean all',installed+' explain',installed+' plan',installed+' apply'):
+  for command in ('go build -buildvcs=false -trimpath','stillmac doctor','stillmac scan --format text','stillmac clean all','stillmac explain','stillmac plan','stillmac apply','stillmac protect','stillmac history','stillmac sample','stillmac status','stillmac report --format markdown','stillmac help'):
    self.assertIn(command,text)
+  self.assertIn('export PATH="$HOME/.local/bin:$PATH"',text)
+  self.assertIn('Run this once',text)
+  self.assertIn('use that file instead. Do not add the same line to both files.',text)
+  self.assertIn('Troubleshooting fallback',text)
   self.assertIn('Mac developers',text)
   self.assertIn('Signing and Apple notarisation are not claimed for this beta.',text)
   self.assertIn('Example only. Your sizes and IDs will differ.',text)
   self.assertIn('`sample` saves one point-in-time process and memory snapshot.',text)
   self.assertLess(text.index('## Quick start'),text.index('## Build from source'))
-  self.assertLess(text.index(installed+' clean all'),text.index(installed+' plan'))
+  self.assertLess(text.index('stillmac clean all'),text.index('stillmac plan'))
   self.assertNotIn('./bin/stillmac',text[:text.index('## Build from source')])
   self.assertIn("StillMac's first public beta release is `v0.1.1`.",text)
   self.assertIn('Apple Silicon Macs only',text)

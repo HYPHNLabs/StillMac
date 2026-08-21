@@ -71,3 +71,11 @@ new=$(mktemp "$bin/.stillmac.new.XXXXXXXX") || fail 'cannot create destination s
 if [ -e "$bin/stillmac" ]; then mv "$bin/stillmac" "$new.old" || { rm -f "$new"; fail 'cannot preserve existing binary'; }; fi
 if mv "$new" "$bin/stillmac"; then rm -f "$new.old"; else rm -f "$new"; [ -e "$new.old" ] && mv "$new.old" "$bin/stillmac"; fail 'cannot install binary'; fi
 printf 'installed %s\n' "$bin/stillmac"
+printf '%s\n' \
+  'StillMac does not modify shell configuration.' \
+  'For the default macOS zsh shell, run this once:' \
+  "  printf '\\nexport PATH=\"\$HOME/.local/bin:\$PATH\"\\n' >> \"\$HOME/.zprofile\"" \
+  '  exec zsh -l' \
+  'If you manage PATH in $HOME/.zshrc, use that file instead. Do not add the same line to both files.' \
+  'Then run:' \
+  '  stillmac doctor'
