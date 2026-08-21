@@ -4,26 +4,29 @@
 
 # StillMac
 
-StillMac is a local macOS CLI for inspecting process and memory snapshots and reviewing developer caches that may be using disk space.
+StillMac helps Mac developers record point-in-time process and memory measurements and review developer caches that may be using disk space.
 
-It is deliberately conservative. StillMac can clean only the exact Go build cache, and only after you review and approve a short-lived plan. Homebrew caches, Codex runtimes, and Git worktrees are reported for review but remain inventory-only.
+It runs locally and can clean one thing in this beta: the exact Go build cache, after showing a short-lived plan and asking for explicit approval. It is not a general-purpose Mac cleaner.
 
-## What StillMac does
+## Who StillMac is for
 
-- Captures explicit, local process and memory snapshots for baseline reports.
-- Scans a fixed set of developer-cache roots and reports measured size and safety decisions.
-- Adds path-minimised Git worktree inventory when you provide a project scope.
-- Creates a 15-minute cleanup plan for eligible items.
-- Uses the verified owner-native action `go clean -cache` for the exact Go build cache after explicit approval and revalidation.
-- Writes a receipt showing measured bytes before and after the action.
+StillMac is for Mac developers who use tools such as Go, Homebrew, Git worktrees, or Codex and want evidence before cleanup.
 
-StillMac does **not** delete Homebrew caches, Codex runtimes, or Git worktrees. It does not scan arbitrary locations, terminate processes, elevate privileges, run in the background, or perform mystery deletion.
+You can use it to:
 
-## Current status
+- take an explicit process and memory snapshot;
+- measure a fixed set of developer-cache roots;
+- review path-minimised Git worktree inventory for a project;
+- clean an eligible Go build cache after approval;
+- keep a private local receipt of the measured result.
+
+Homebrew caches, Codex runtimes, and Git worktrees remain inventory-only. StillMac never cleans them.
+
+## Public beta limits
 
 StillMac's first public beta release is `v0.1.1`. It supports **Apple Silicon Macs only** and has been executed on macOS 26.5. Other macOS versions are not yet verified runtime claims.
 
-Homebrew and Agent Skill distribution remain inactive. See [INSTALL.md](INSTALL.md) for the exact lifecycle and inspect-first route.
+Signing and Apple notarisation are not claimed for this beta. Homebrew and Agent Skill distribution are also inactive.
 
 ## Install
 
@@ -31,84 +34,105 @@ Homebrew and Agent Skill distribution remain inactive. See [INSTALL.md](INSTALL.
 curl -fsSL https://github.com/HYPHNLabs/StillMac/releases/download/v0.1.1/stillmac-install-v0.1.1.sh | sh
 ```
 
-The installer is pinned to the `v0.1.1` manifest, verifies the archive checksum, installs per-user without `sudo`, and runs `doctor` before replacing an existing binary. The command is usable only when that exact versioned GitHub Release asset is available; otherwise it fails closed.
+The installer verifies the pinned `v0.1.1` manifest and archive, installs without `sudo`, and runs `doctor` before replacing an existing binary. It installs StillMac at `$HOME/.local/bin/stillmac` and does not edit your shell configuration, so the examples below use that full path.
 
-Inspect first:
+Prefer to inspect the installer first? See [INSTALL.md](INSTALL.md) for the inspect-first route, source build, and uninstall instructions.
+
+## Quick start
+
+Check the installation, then run a read-only scan:
 
 ```bash
-curl -fsSLo /tmp/stillmac-install-v0.1.1.sh \
-  https://github.com/HYPHNLabs/StillMac/releases/download/v0.1.1/stillmac-install-v0.1.1.sh
-less /tmp/stillmac-install-v0.1.1.sh
-sh /tmp/stillmac-install-v0.1.1.sh
+$HOME/.local/bin/stillmac doctor
+$HOME/.local/bin/stillmac scan --format text
 ```
+
+`doctor` checks whether StillMac can run safely. `scan` measures and classifies the fixed cache roots. Neither command cleans anything.
+
+To review the interactive cleanup flow:
+
+```bash
+$HOME/.local/bin/stillmac clean all
+```
+
+`clean all` shows every candidate and exclusion, creates a 15-minute plan containing only eligible `SAFE` items, and asks you to type the exact plan approval before it acts. If the state changes or safety cannot be proved, StillMac stops. In this beta, only the exact Go build cache can be eligible.
+
+## Example scan
+
+Example only. Your sizes and IDs will differ.
+
+```text
+1. sm-1111111111111111 REVIEW Homebrew download cache 734003200 bytes: exact allowlisted cache root; this release has no bounded owner-native Homebrew action
+2. sm-2222222222222222 SAFE Go build cache 536870912 bytes: exact allowlisted Go cache root; owner-native Go executable and GOCACHE verified
+3. sm-3333333333333333 BLOCKED_ACTIVE Codex runtime cache 0 bytes: Codex inactivity was not proven
+```
+
+- `SAFE` means the item is eligible for a plan. It is not cleaned automatically.
+- `REVIEW` means StillMac can show the inventory but has no cleanup action for it.
+- `BLOCKED_*` means StillMac could not prove that an action would be safe.
+
+## What StillMac can change
+
+The only active cleanup action is the verified owner-native command `go clean -cache` for the exact Go build cache. StillMac performs revalidation immediately before invoking it, then writes a receipt with the measured bytes before and after the action.
+
+Cleaning the Go build cache can free disk space, but later Go builds may take longer while cache entries are rebuilt.
+
+StillMac does not delete Homebrew caches, Codex runtimes, or Git worktrees. It does not scan arbitrary locations, terminate processes, elevate privileges, run in the background, or provide generic path deletion.
+
+## Process and memory snapshots
+
+`sample` saves one point-in-time process and memory snapshot. Repeated manual samples build the coverage shown by `status`; `report` renders the latest stored sample. StillMac never samples automatically.
+
+```bash
+$HOME/.local/bin/stillmac sample
+$HOME/.local/bin/stillmac status
+$HOME/.local/bin/stillmac report --format markdown
+```
+
+Reports describe measurements observed during the same collection cycle. They do not claim that a process caused memory pressure, and one sample cannot establish a trend.
+
+## Advanced and automated use
+
+Human users should normally start with `clean all`. For automation or agent workflows, keep planning and approval separate and use the stable IDs from a fresh scan:
+
+```bash
+# Explain one current candidate
+$HOME/.local/bin/stillmac explain sm-0123456789abcdef --format text
+
+# Preview every currently eligible candidate
+$HOME/.local/bin/stillmac plan all-safe --format text
+
+# Apply only after reviewing that exact plan
+$HOME/.local/bin/stillmac apply plan-0123456789abcdef --format json
+
+# Review local receipts
+$HOME/.local/bin/stillmac history --format text
+```
+
+Candidate and plan IDs above are shape examples only. Never invent an ID or reuse one from a different scan. Plans expire after 15 minutes.
+
+To add path-free Git worktree inventory for one project:
+
+```bash
+$HOME/.local/bin/stillmac scan --scope /path/to/project --format text
+```
+
+Providing a project scope adds inventory only. StillMac never performs a Git cleanup action.
 
 ## Build from source
 
-Requirements:
-
-- macOS
-- Go 1.23 or later
+Requirements: Apple Silicon macOS and Go 1.23 or later.
 
 ```bash
 git clone https://github.com/HYPHNLabs/StillMac.git
 cd StillMac
 mkdir -p ./bin
 go build -buildvcs=false -trimpath -o ./bin/stillmac ./cmd/stillmac
-./bin/stillmac help
-```
-
-The public beta is Apple Silicon only. It has been executed locally on macOS 26.5.
-
-## Start with a read-only scan
-
-Check the local setup, then scan the default developer-cache roots:
-
-```bash
 ./bin/stillmac doctor
 ./bin/stillmac scan --format text
 ```
 
-To include path-free Git worktree inventory for one project:
-
-```bash
-./bin/stillmac scan --scope /path/to/project --format text
-```
-
-A scan measures and classifies. It does not clean anything.
-
-Process and memory sampling is separate and always explicit:
-
-```bash
-./bin/stillmac sample
-./bin/stillmac status
-./bin/stillmac report --format markdown
-```
-
-There is no scheduler and no `stillmac learn` command.
-
-## Review, plan, approve, apply
-
-Use the stable candidate ID printed by the scan. The IDs below are examples only. Never invent or reuse an ID from a different scan.
-
-```bash
-# 1. Review the evidence
-./bin/stillmac explain sm-0123456789abcdef --format text
-
-# 2. Preview a short-lived plan
-./bin/stillmac plan sm-0123456789abcdef --format text
-# Or include every currently eligible safe candidate
-./bin/stillmac plan all-safe --format text
-
-# 3. Approve and apply that exact plan
-./bin/stillmac apply plan-0123456789abcdef --format json
-
-# 4. Review the receipt
-./bin/stillmac history --format text
-```
-
-Plans expire after 15 minutes. Apply performs revalidation of the plan, host, protection state, rule, cache identity, fingerprint, and Go executable binding before invoking the bounded Go action. If anything changed or cannot be proved safe, StillMac fails closed.
-
-For an interactive terminal, `./bin/stillmac clean all` provides the same scan, review, plan, exact approval, apply, and receipt flow. Non-interactive callers must use separate `plan` and `apply` commands.
+The `./bin/stillmac` path applies only to this source-build route.
 
 ## Privacy
 
@@ -125,7 +149,7 @@ Read [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md) for the complete bo
 
 ## Detailed documentation
 
-- [Installation status and source build](INSTALL.md)
+- [Installation and uninstall](INSTALL.md)
 - [Developer cleanup contract](docs/DEVELOPER-CLEANUP-CONTRACT.md)
 - [v0.1 tracer contract](docs/V0.1-TRACER-CONTRACT.md)
 - [Architecture](docs/ARCHITECTURE.md)
