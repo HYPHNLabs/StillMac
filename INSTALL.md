@@ -19,6 +19,26 @@ less /tmp/stillmac-install-v0.1.1.sh
 sh /tmp/stillmac-install-v0.1.1.sh
 ```
 
+## Add StillMac to PATH
+
+The installer does not edit shell configuration. For the default macOS zsh shell, run this once:
+
+```sh
+printf '\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$HOME/.zprofile"
+exec zsh -l
+```
+
+If you already manage PATH in `$HOME/.zshrc`, use that file instead. Do not add the same line to both files.
+
+Confirm the installation and run a read-only scan:
+
+```sh
+stillmac doctor
+stillmac scan --format text
+```
+
+If the command is not found, open a new Terminal window or run `$HOME/.local/bin/stillmac doctor` directly. See the [README command reference](README.md#command-reference) for the complete command list.
+
 ## Homebrew, INACTIVE
 
 ```sh
@@ -50,6 +70,16 @@ go build -buildvcs=false -trimpath -o ./bin/stillmac ./cmd/stillmac
 
 The last command is read-only. Run `plan` or `apply` only after reviewing [docs/DEVELOPER-CLEANUP-CONTRACT.md](docs/DEVELOPER-CLEANUP-CONTRACT.md).
 
+## Upgrade
+
+StillMac does not update itself. To reinstall `v0.1.1`, rerun its exact version-pinned installer:
+
+```sh
+curl -fsSL https://github.com/HYPHNLabs/StillMac/releases/download/v0.1.1/stillmac-install-v0.1.1.sh | sh
+```
+
+The installer verifies the downloaded release and stages `doctor` before replacing an existing binary. For a later release, use only the exact version-pinned command published on that release page.
+
 ## Uninstall
 
 ```sh
@@ -59,4 +89,4 @@ less /tmp/stillmac-uninstall.sh
 sh /tmp/stillmac-uninstall.sh
 ```
 
-Uninstall removes only `$HOME/.local/bin/stillmac`. Private StillMac data is retained for user-controlled inspection or manual removal.
+Uninstall removes only `$HOME/.local/bin/stillmac`. Private StillMac data is retained for user-controlled inspection. The PATH entry is harmless after uninstall; you may remove the StillMac export line from the profile file you chose during setup.
