@@ -313,10 +313,18 @@ class DistributionTests(unittest.TestCase):
   self.assertIn('draft',text)
  def test_readme_is_a_simple_public_beta_front_page(self):
   text=(ROOT/'README.md').read_text()
-  for heading in ('## What StillMac does','## Current status','## Install','## Build from source','## Start with a read-only scan','## Review, plan, approve, apply','## Privacy','## Detailed documentation'):
+  for heading in ('## Who StillMac is for','## Public beta limits','## Install','## Quick start','## Example scan','## What StillMac can change','## Process and memory snapshots','## Advanced and automated use','## Build from source','## Privacy','## Detailed documentation'):
    self.assertIn(heading,text)
-  for command in ('go build -buildvcs=false -trimpath','./bin/stillmac doctor','./bin/stillmac scan --format text','./bin/stillmac explain','./bin/stillmac plan','./bin/stillmac apply'):
+  installed='$HOME/.local/bin/stillmac'
+  for command in ('go build -buildvcs=false -trimpath',installed+' doctor',installed+' scan --format text',installed+' clean all',installed+' explain',installed+' plan',installed+' apply'):
    self.assertIn(command,text)
+  self.assertIn('Mac developers',text)
+  self.assertIn('Signing and Apple notarisation are not claimed for this beta.',text)
+  self.assertIn('Example only. Your sizes and IDs will differ.',text)
+  self.assertIn('`sample` saves one point-in-time process and memory snapshot.',text)
+  self.assertLess(text.index('## Quick start'),text.index('## Build from source'))
+  self.assertLess(text.index(installed+' clean all'),text.index(installed+' plan'))
+  self.assertNotIn('./bin/stillmac',text[:text.index('## Build from source')])
   self.assertIn("StillMac's first public beta release is `v0.1.1`.",text)
   self.assertIn('Apple Silicon Macs only',text)
   self.assertIn('curl -fsSL https://github.com/HYPHNLabs/StillMac/releases/download/v0.1.1/stillmac-install-v0.1.1.sh | sh',text)
