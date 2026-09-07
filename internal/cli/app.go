@@ -76,6 +76,8 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, deps Depe
 	}
 
 	switch args[0] {
+	case "protections", "unprotect":
+		return runProtectionCommand(args, stdout, stderr, deps)
 	case "doctor":
 		dataDir, err := commandDataDir(args[1:], deps.DefaultDataDir)
 		if errors.Is(err, errDefaultDataDir) {
