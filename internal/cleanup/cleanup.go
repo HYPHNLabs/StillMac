@@ -22,6 +22,18 @@ import (
 
 type Decision string
 
+// SizeStatus describes how much confidence StillMac has in Candidate.Bytes.
+// It is intentionally not part of the v1 JSON schema. The legacy bytes field
+// remains for compatibility; callers that render human output should use this
+// status to avoid presenting zero as a measured size.
+type SizeStatus string
+
+const (
+	SizeExact   SizeStatus = "exact"
+	SizePartial SizeStatus = "partial"
+	SizeUnknown SizeStatus = "unknown"
+)
+
 const (
 	Safe            Decision = "SAFE"
 	Review          Decision = "REVIEW"
@@ -49,7 +61,28 @@ type Candidate struct {
 	Fingerprint  string   `json:"fingerprint"`
 	CurrentState string   `json:"current_state"`
 	RootKind     string   `json:"root_kind"`
+	sizeStatus   SizeStatus
 }
+
+// SizeStatus reports whether Bytes is exact, a lower-bound partial traversal,
+// or unavailable. Candidates decoded from the legacy v1 shape have no
+// internal status; known inventory-only and unsafe states therefore fall back
+// to unknown, while other legacy values retain the historical bytes meaning.
+func (c Candidate) SizeStatus() SizeStatus {
+	if c.sizeStatus != "" {
+		return c.sizeStatus
+	}
+	if c.Family == "codex-runtime-cache" || c.Family == "git-worktree" {
+		return SizeUnknown
+	}
+	switch c.CurrentState {
+	case "activity-unproven", "integration-base-unknown", "merge-check-unknown", "inventory-partial", "prunable", "unknown", "unsafe-entry", "unsafe-root":
+		return SizeUnknown
+	}
+	return SizeExact
+}
+
+func (c Candidate) HasExactSize() bool { return c.SizeStatus() == SizeExact }
 
 type Plan struct {
 	SchemaVersion string      `json:"schema_version"`
@@ -94,24 +127,26 @@ type GitResult struct {
 type GitRunner func(args ...string) (GitResult, error)
 
 type ScanConfig struct {
-	Home          string
-	Scope         string
-	DataDir       string
-	Now           time.Time
-	Protected     map[string]string
-	CodexInactive *bool
-	GitRunner     GitRunner
-	GoCleaner     GoCleaner
+	Home            string
+	Scope           string
+	IntegrationBase string
+	DataDir         string
+	Now             time.Time
+	Protected       map[string]string
+	CodexInactive   *bool
+	GitRunner       GitRunner
+	GoCleaner       GoCleaner
 }
 
 type Config struct {
-	Home          string
-	DataDir       string
-	HostID        string
-	Now           func() time.Time
-	CodexInactive *bool
-	GitRunner     GitRunner
-	GoCleaner     GoCleaner
+	Home            string
+	DataDir         string
+	IntegrationBase string
+	HostID          string
+	Now             func() time.Time
+	CodexInactive   *bool
+	GitRunner       GitRunner
+	GoCleaner       GoCleaner
 }
 
 type Engine struct{ Config Config }
@@ -199,7 +234,7 @@ func (e *Engine) Scan(scope string) ([]Candidate, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ScanWithConfig(ScanConfig{Home: home, Scope: scope, DataDir: e.Config.DataDir, Now: e.now(), Protected: protected, CodexInactive: e.Config.CodexInactive, GitRunner: e.Config.GitRunner, GoCleaner: e.Config.GoCleaner})
+	return ScanWithConfig(ScanConfig{Home: home, Scope: scope, IntegrationBase: e.Config.IntegrationBase, DataDir: e.Config.DataDir, Now: e.now(), Protected: protected, CodexInactive: e.Config.CodexInactive, GitRunner: e.Config.GitRunner, GoCleaner: e.Config.GoCleaner})
 }
 
 func Scan(scope string, now time.Time) ([]Candidate, error) {
@@ -262,8 +297,8 @@ func ScanWithConfig(c ScanConfig) ([]Candidate, error) {
 		}
 		out = append(out, *item)
 	}
-	if c.Scope != "" && c.Scope != "." {
-		gitItems, err := inspectWorktrees(c.Scope, c.Now, c.GitRunner)
+	if c.Scope != "" {
+		gitItems, err := inspectWorktreesWithBase(c.Scope, c.Now, c.GitRunner, c.IntegrationBase)
 		if err != nil {
 			return nil, err
 		}
@@ -289,7 +324,7 @@ func inspectCache(home, root string, rule rootRule, now time.Time, codexInactive
 	if err != nil {
 		return nil, err
 	}
-	c := &Candidate{ID: stableID(rule.family, rule.rel), Family: rule.family, RuleVersion: rule.rule, CapturedAt: now.UTC().Format(time.RFC3339), Label: rule.label, RootKind: rule.kind, Action: "none"}
+	c := &Candidate{ID: stableID(rule.family, rule.rel), Family: rule.family, RuleVersion: rule.rule, CapturedAt: now.UTC().Format(time.RFC3339), Label: rule.label, RootKind: rule.kind, Action: "none", sizeStatus: SizeUnknown}
 	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
 		c.Decision, c.CurrentState, c.Reasons = BlockedUnknown, "unsafe-root", []string{"exact root is not a real directory"}
 		return c, nil
@@ -301,8 +336,9 @@ func inspectCache(home, root string, rule rootRule, now time.Time, codexInactive
 		}
 		return c, nil
 	}
-	c.Bytes, err = treeBytes(root)
-	if err != nil {
+	measurement := measureTree(root)
+	c.Bytes, c.sizeStatus = measurement.Bytes, measurement.Status
+	if err = measurement.Err; err != nil {
 		if rule.family == "homebrew-cache" {
 			c.Decision, c.CurrentState, c.Reasons = Review, "inventory-partial", []string{"this release has no bounded owner-native Homebrew action", "cache size could not be safely measured"}
 			return c, nil
@@ -340,10 +376,29 @@ func inspectCache(home, root string, rule rootRule, now time.Time, codexInactive
 
 type worktree struct {
 	path, branch     string
+	primary          bool
 	locked, prunable bool
 }
 
 func inspectWorktrees(scope string, now time.Time, runner GitRunner) ([]Candidate, error) {
+	return inspectWorktreesWithBase(scope, now, runner, "")
+}
+
+type integrationBaseStatus string
+
+const (
+	integrationBaseResolved    integrationBaseStatus = "resolved"
+	integrationBaseMissing     integrationBaseStatus = "missing"
+	integrationBaseAmbiguous   integrationBaseStatus = "ambiguous"
+	integrationBaseUnavailable integrationBaseStatus = "unavailable"
+)
+
+type integrationBase struct {
+	commit string
+	status integrationBaseStatus
+}
+
+func inspectWorktreesWithBase(scope string, now time.Time, runner GitRunner, suppliedBase string) ([]Candidate, error) {
 	absScope, err := filepath.Abs(scope)
 	if err != nil {
 		return nil, err
@@ -364,19 +419,27 @@ func inspectWorktrees(scope string, now time.Time, runner GitRunner) ([]Candidat
 	}
 	result, err := runner("-C", absScope, "worktree", "list", "--porcelain")
 	if err != nil {
-		return []Candidate{{ID: stableID("git-worktree", absScope), Family: "git-worktree", RuleVersion: "git-worktree.v1", Decision: BlockedUnknown, Reasons: []string{"Git worktree inventory unavailable"}, Action: "none", CapturedAt: now.UTC().Format(time.RFC3339), Label: "Git worktree inventory", CurrentState: "unknown", RootKind: "git-worktree"}}, nil
+		return []Candidate{{ID: stableID("git-worktree", absScope), Family: "git-worktree", RuleVersion: "git-worktree.v1", Decision: BlockedUnknown, Reasons: []string{"Git worktree inventory unavailable"}, Action: "none", CapturedAt: now.UTC().Format(time.RFC3339), Label: "Git worktree inventory", CurrentState: "unknown", RootKind: "git-worktree", sizeStatus: SizeUnknown}}, nil
 	}
 	if result.ExitCode != 0 {
-		return []Candidate{{ID: stableID("git-worktree", absScope), Family: "git-worktree", RuleVersion: "git-worktree.v1", Decision: BlockedUnknown, Reasons: []string{"Git worktree inventory unavailable"}, Action: "none", CapturedAt: now.UTC().Format(time.RFC3339), Label: "Git worktree inventory", CurrentState: "unknown", RootKind: "git-worktree"}}, nil
+		return []Candidate{{ID: stableID("git-worktree", absScope), Family: "git-worktree", RuleVersion: "git-worktree.v1", Decision: BlockedUnknown, Reasons: []string{"Git worktree inventory unavailable"}, Action: "none", CapturedAt: now.UTC().Format(time.RFC3339), Label: "Git worktree inventory", CurrentState: "unknown", RootKind: "git-worktree", sizeStatus: SizeUnknown}}, nil
 	}
 	parsed := parseWorktrees(string(result.Output))
 	items := make([]Candidate, 0, len(parsed))
+	var base integrationBase
+	baseResolved := false
+	canonicalScope := canonicalPath(absScope)
+	if repositoryRoot, ok := resolveRepositoryRoot(absScope, runner); ok {
+		canonicalScope = canonicalPath(repositoryRoot)
+	}
 	for i, wt := range parsed {
-		c := Candidate{ID: stableID("git-worktree", wt.path), Family: "git-worktree", RuleVersion: "git-worktree.v1", Decision: Review, Reasons: []string{"clean merged inactive worktree; inventory only"}, Action: "none", Reversible: false, CapturedAt: now.UTC().Format(time.RFC3339), Label: fmt.Sprintf("Git linked worktree %d", i+1), CurrentState: "clean-merged", RootKind: "git-worktree"}
+		c := Candidate{ID: stableID("git-worktree", wt.path), Family: "git-worktree", RuleVersion: "git-worktree.v1", Decision: Review, Reasons: []string{"clean worktree; inventory only"}, Action: "none", Reversible: false, CapturedAt: now.UTC().Format(time.RFC3339), Label: fmt.Sprintf("Git linked worktree %d", i+1), CurrentState: "clean", RootKind: "git-worktree", sizeStatus: SizeUnknown}
 		cleanPath, _ := filepath.Abs(wt.path)
 		switch {
-		case cleanPath == absScope || wt.branch == "refs/heads/main" || wt.branch == "refs/heads/master":
-			c.Decision, c.CurrentState, c.Reasons = BlockedActive, "current", []string{"current or main worktree"}
+		case canonicalPath(cleanPath) == canonicalScope || pathContains(canonicalPath(cleanPath), canonicalPath(absScope)):
+			c.Decision, c.CurrentState, c.Reasons = BlockedActive, "current", []string{"scope identifies the current worktree"}
+		case wt.primary:
+			c.Decision, c.CurrentState, c.Reasons = BlockedActive, "primary", []string{"Git identified the primary repository worktree"}
 		case wt.locked:
 			c.Decision, c.CurrentState, c.Reasons = BlockedActive, "locked", []string{"worktree is locked"}
 		case wt.prunable:
@@ -389,11 +452,29 @@ func inspectWorktrees(scope string, now time.Time, runner GitRunner) ([]Candidat
 				c.Decision, c.CurrentState, c.Reasons = BlockedUnknown, "unknown", []string{"worktree status unavailable"}
 			} else if len(strings.TrimSpace(string(statusResult.Output))) != 0 {
 				c.Decision, c.CurrentState, c.Reasons = BlockedDirty, "dirty", []string{"worktree has changes"}
-			} else if mergeResult, mergeErr := runner("-C", cleanPath, "merge-base", "--is-ancestor", "HEAD", "main"); mergeErr != nil || mergeResult.ExitCode != 0 {
-				if mergeErr == nil && mergeResult.ExitCode == 1 {
-					c.Decision, c.CurrentState, c.Reasons = BlockedUnmerged, "unmerged", []string{"HEAD is not proven merged into main"}
-				} else {
-					c.Decision, c.CurrentState, c.Reasons = BlockedUnknown, "unknown", []string{"Git merge status unavailable"}
+			} else {
+				if !baseResolved {
+					base = resolveIntegrationBase(absScope, suppliedBase, runner)
+					baseResolved = true
+				}
+				switch base.status {
+				case integrationBaseMissing:
+					c.Decision, c.CurrentState, c.Reasons = BlockedUnknown, "integration-base-unknown", []string{"local integration base is missing; merge status is unknown"}
+				case integrationBaseAmbiguous:
+					c.Decision, c.CurrentState, c.Reasons = BlockedUnknown, "integration-base-unknown", []string{"local integration base is ambiguous; merge status is unknown"}
+				case integrationBaseUnavailable:
+					c.Decision, c.CurrentState, c.Reasons = BlockedUnknown, "integration-base-unknown", []string{"local integration base could not be resolved; merge status is unknown"}
+				case integrationBaseResolved:
+					mergeResult, mergeErr := runner("-C", cleanPath, "merge-base", "--is-ancestor", "HEAD", base.commit)
+					if mergeErr != nil || mergeResult.ExitCode != 0 {
+						if mergeErr == nil && mergeResult.ExitCode == 1 {
+							c.Decision, c.CurrentState, c.Reasons = BlockedUnmerged, "merge-unproven", []string{"HEAD is not proven ancestral to the local integration base; squash history is not inferred"}
+						} else {
+							c.Decision, c.CurrentState, c.Reasons = BlockedUnknown, "merge-check-unknown", []string{"Git merge ancestry check is unavailable"}
+						}
+					} else {
+						c.CurrentState, c.Reasons = "clean-merged", []string{"clean worktree; ancestry is proven against the local integration base; inventory only"}
+					}
 				}
 			}
 		}
@@ -423,7 +504,102 @@ func parseWorktrees(s string) []worktree {
 	if cur != nil {
 		out = append(out, *cur)
 	}
+	for i := range out {
+		// Git's porcelain inventory identifies the primary repository worktree
+		// by position, independently of the branch checked out there.
+		out[i].primary = i == 0
+	}
 	return out
+}
+
+func resolveIntegrationBase(scope, supplied string, runner GitRunner) integrationBase {
+	if supplied != "" {
+		if strings.ContainsAny(supplied, "\x00\r\n") {
+			return integrationBase{status: integrationBaseUnavailable}
+		}
+		return resolveIntegrationRevision(scope, supplied, runner, integrationBaseUnavailable)
+	}
+	result, err := runner("-C", scope, "for-each-ref", "--format=%(refname)", "refs/heads/main", "refs/heads/master")
+	if err != nil || result.ExitCode != 0 {
+		return integrationBase{status: integrationBaseUnavailable}
+	}
+	refs := uniqueNonEmptyLines(string(result.Output))
+	if len(refs) > 1 {
+		return integrationBase{status: integrationBaseAmbiguous}
+	}
+	if len(refs) == 0 {
+		// A configured local origin/HEAD is still local evidence. Resolving it
+		// never fetches or consults a remote service.
+		result, err = runner("-C", scope, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD")
+		if err != nil || result.ExitCode != 0 {
+			return integrationBase{status: integrationBaseMissing}
+		}
+		refs = uniqueNonEmptyLines(string(result.Output))
+		if len(refs) == 0 {
+			return integrationBase{status: integrationBaseMissing}
+		}
+		if len(refs) > 1 {
+			return integrationBase{status: integrationBaseAmbiguous}
+		}
+	}
+	return resolveIntegrationRevision(scope, refs[0], runner, integrationBaseUnavailable)
+}
+
+func resolveIntegrationRevision(scope, ref string, runner GitRunner, failure integrationBaseStatus) integrationBase {
+	result, err := runner("-C", scope, "rev-parse", "--verify", "--end-of-options", ref+"^{commit}")
+	if err != nil || result.ExitCode != 0 {
+		return integrationBase{status: failure}
+	}
+	values := strings.Fields(string(result.Output))
+	if len(values) != 1 || strings.ContainsAny(values[0], "/\x00\r\n") {
+		return integrationBase{status: failure}
+	}
+	return integrationBase{commit: values[0], status: integrationBaseResolved}
+}
+
+func uniqueNonEmptyLines(s string) []string {
+	seen := map[string]bool{}
+	var values []string
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || seen[line] {
+			continue
+		}
+		seen[line] = true
+		values = append(values, line)
+	}
+	return values
+}
+
+func canonicalPath(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return filepath.Clean(path)
+	}
+	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
+		return filepath.Clean(resolved)
+	}
+	return filepath.Clean(abs)
+}
+
+func resolveRepositoryRoot(scope string, runner GitRunner) (string, bool) {
+	result, err := runner("-C", scope, "rev-parse", "--show-toplevel")
+	if err != nil || result.ExitCode != 0 {
+		return "", false
+	}
+	value := strings.TrimSpace(string(result.Output))
+	if value == "" || strings.ContainsAny(value, "\x00\r\n") || !filepath.IsAbs(value) {
+		return "", false
+	}
+	return value, true
+}
+
+func pathContains(root, child string) bool {
+	rel, err := filepath.Rel(root, child)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return false
+	}
+	return rel == "." || rel != ""
 }
 
 func (e *Engine) Plan(items []Candidate, ids []string) (Plan, error) {
@@ -1008,12 +1184,20 @@ func validateCreationPath(path string) error {
 	}
 }
 
-func treeBytes(root string) (int64, error) {
-	var total int64
+type treeMeasurement struct {
+	Bytes  int64
+	Status SizeStatus
+	Err    error
+}
+
+func measureTree(root string) treeMeasurement {
+	measurement := treeMeasurement{Status: SizeUnknown}
+	visited := 0
 	err := filepath.WalkDir(root, func(_ string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
+		visited++
 		if d.Type()&os.ModeSymlink != 0 {
 			return errors.New("symlink inside cache root")
 		}
@@ -1022,14 +1206,25 @@ func treeBytes(root string) (int64, error) {
 			if err != nil {
 				return err
 			}
-			total, err = addTreeBytes(total, i.Size())
+			measurement.Bytes, err = addTreeBytes(measurement.Bytes, i.Size())
 			if err != nil {
 				return err
 			}
 		}
 		return nil
 	})
-	return total, err
+	measurement.Err = err
+	if err == nil {
+		measurement.Status = SizeExact
+	} else if visited > 0 {
+		measurement.Status = SizePartial
+	}
+	return measurement
+}
+
+func treeBytes(root string) (int64, error) {
+	measurement := measureTree(root)
+	return measurement.Bytes, measurement.Err
 }
 func addTreeBytes(total, size int64) (int64, error) {
 	if size < 0 || size > math.MaxInt64-total {

@@ -145,6 +145,13 @@ func TestUnsafeHomebrewEntryRemainsNonExecutableReview(t *testing.T) {
 	if decisions["homebrew-cache"] != Review || decisions["go-build-cache"] != Safe {
 		t.Fatalf("decisions=%#v", decisions)
 	}
+	for _, item := range items {
+		if item.Family == "homebrew-cache" {
+			if item.SizeStatus() != SizePartial {
+				t.Fatalf("partial Homebrew size = %#v", item)
+			}
+		}
+	}
 }
 
 func TestGitWorktreePorcelainClassifications(t *testing.T) {
@@ -164,6 +171,12 @@ func TestGitWorktreePorcelainClassifications(t *testing.T) {
 		joined := strings.Join(args, "\x00")
 		if strings.Contains(joined, "worktree\x00list\x00--porcelain") {
 			return GitResult{Output: []byte(porcelain)}, nil
+		}
+		if strings.Contains(joined, "for-each-ref") {
+			return GitResult{Output: []byte("refs/heads/main\n")}, nil
+		}
+		if strings.Contains(joined, "rev-parse") {
+			return GitResult{Output: []byte(strings.Repeat("a", 40) + "\n")}, nil
 		}
 		for i, p := range paths {
 			if strings.Contains(joined, p+"\x00status") && i == 1 {
@@ -194,7 +207,7 @@ func TestGitWorktreePorcelainClassifications(t *testing.T) {
 			}
 		}
 	}
-	for state, want := range map[string]Decision{"current": BlockedActive, "dirty": BlockedDirty, "locked": BlockedActive, "unmerged": BlockedUnmerged, "clean-merged": Review} {
+	for state, want := range map[string]Decision{"current": BlockedActive, "dirty": BlockedDirty, "locked": BlockedActive, "merge-unproven": BlockedUnmerged, "clean-merged": Review} {
 		if got[state] != want {
 			t.Fatalf("%s = %q, want %q; all=%#v", state, got[state], want, got)
 		}
@@ -211,6 +224,10 @@ func TestGitMergeOperationalFailureIsBlockedUnknown(t *testing.T) {
 		switch {
 		case strings.Contains(joined, "worktree\x00list\x00--porcelain"):
 			return GitResult{Output: []byte(porcelain)}, nil
+		case strings.Contains(joined, "for-each-ref"):
+			return GitResult{Output: []byte("refs/heads/main\n")}, nil
+		case strings.Contains(joined, "rev-parse"):
+			return GitResult{Output: []byte(strings.Repeat("b", 40) + "\n")}, nil
 		case strings.Contains(joined, "status\x00--porcelain"):
 			return GitResult{}, nil
 		case strings.Contains(joined, "merge-base"):
@@ -225,13 +242,295 @@ func TestGitMergeOperationalFailureIsBlockedUnknown(t *testing.T) {
 	}
 	for _, item := range items {
 		if item.Family == "git-worktree" && item.CurrentState != "current" {
-			if item.Decision != BlockedUnknown || item.CurrentState != "unknown" {
+			if item.Decision != BlockedUnknown || item.CurrentState != "merge-check-unknown" {
 				t.Fatalf("operational merge failure = %#v", item)
 			}
 			return
 		}
 	}
 	t.Fatal("linked worktree candidate missing")
+}
+
+func TestLinkedWorktreeOnMainBranchIsNotPrimaryByBranchName(t *testing.T) {
+	home, data := cacheFixture(t)
+	scope := filepath.Join(t.TempDir(), "primary")
+	linked := filepath.Join(t.TempDir(), "linked")
+	porcelain := "worktree " + scope + "\nHEAD primary\nbranch refs/heads/feature\n\n" +
+		"worktree " + linked + "\nHEAD linked\nbranch refs/heads/main\n"
+	runner := func(args ...string) (GitResult, error) {
+		joined := strings.Join(args, "\x00")
+		switch {
+		case strings.Contains(joined, "worktree\x00list\x00--porcelain"):
+			return GitResult{Output: []byte(porcelain)}, nil
+		case strings.Contains(joined, "for-each-ref"):
+			return GitResult{Output: []byte("refs/heads/main\n")}, nil
+		case strings.Contains(joined, "rev-parse"):
+			return GitResult{Output: []byte(strings.Repeat("c", 40) + "\n")}, nil
+		case strings.Contains(joined, "status\x00--porcelain"):
+			return GitResult{}, nil
+		case strings.Contains(joined, "merge-base"):
+			return GitResult{}, nil
+		default:
+			return GitResult{}, nil
+		}
+	}
+	items, err := ScanWithConfig(ScanConfig{Home: home, DataDir: data, Scope: scope, Now: fixedNow, GitRunner: runner, GoCleaner: verifiedFakeGoCleaner(home)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range items {
+		if item.Family == "git-worktree" && strings.Contains(item.Label, "2") {
+			if item.Decision != Review {
+				t.Fatalf("linked main-branch worktree = %#v", item)
+			}
+			for _, reason := range item.Reasons {
+				if strings.Contains(reason, "inactive") {
+					t.Fatalf("unsupported inactivity claim = %#v", item)
+				}
+			}
+			return
+		}
+	}
+	t.Fatal("linked worktree candidate missing")
+}
+
+func TestWorktreeMergeNeedsResolvedLocalBase(t *testing.T) {
+	home, data := cacheFixture(t)
+	scope := filepath.Join(t.TempDir(), "primary")
+	linked := filepath.Join(t.TempDir(), "linked")
+	porcelain := "worktree " + scope + "\nHEAD primary\nbranch refs/heads/feature\n\n" +
+		"worktree " + linked + "\nHEAD linked\nbranch refs/heads/feature-two\n"
+	runner := func(args ...string) (GitResult, error) {
+		joined := strings.Join(args, "\x00")
+		switch {
+		case strings.Contains(joined, "worktree\x00list\x00--porcelain"):
+			return GitResult{Output: []byte(porcelain)}, nil
+		case strings.Contains(joined, "status\x00--porcelain"):
+			return GitResult{}, nil
+		default:
+			return GitResult{}, nil
+		}
+	}
+	items, err := ScanWithConfig(ScanConfig{Home: home, DataDir: data, Scope: scope, Now: fixedNow, GitRunner: runner, GoCleaner: verifiedFakeGoCleaner(home)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range items {
+		if item.Family == "git-worktree" && strings.Contains(item.Label, "2") {
+			if item.Decision != BlockedUnknown {
+				t.Fatalf("missing integration base = %#v", item)
+			}
+			return
+		}
+	}
+	t.Fatal("linked worktree candidate missing")
+}
+
+func TestDotScopeIncludesRepositoryWorktreeFacts(t *testing.T) {
+	home, data := cacheFixture(t)
+	items, err := ScanWithConfig(ScanConfig{Home: home, DataDir: data, Scope: ".", Now: fixedNow, GoCleaner: verifiedFakeGoCleaner(home)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range items {
+		if item.Family == "git-worktree" && (item.CurrentState == "current" || item.CurrentState == "primary") {
+			return
+		}
+	}
+	t.Fatalf("dot scope did not expose the current repository worktree: %#v", items)
+}
+
+func TestScopeSubdirectoryUsesRepositoryRootForCurrentWorktree(t *testing.T) {
+	home, data := cacheFixture(t)
+	repoRoot := t.TempDir()
+	subdir := filepath.Join(repoRoot, "src")
+	linked := filepath.Join(t.TempDir(), "linked")
+	if err := os.MkdirAll(subdir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	porcelain := "worktree " + repoRoot + "\nHEAD primary\nbranch refs/heads/feature\n\n" +
+		"worktree " + linked + "\nHEAD linked\nbranch refs/heads/feature-two\n"
+	runner := func(args ...string) (GitResult, error) {
+		joined := strings.Join(args, "\x00")
+		switch {
+		case strings.Contains(joined, "worktree\x00list\x00--porcelain"):
+			return GitResult{Output: []byte(porcelain)}, nil
+		case strings.Contains(joined, "--show-toplevel"):
+			return GitResult{Output: []byte(repoRoot + "\n")}, nil
+		case strings.Contains(joined, "for-each-ref"):
+			return GitResult{Output: []byte("refs/heads/main\n")}, nil
+		case strings.Contains(joined, "rev-parse"):
+			return GitResult{Output: []byte(strings.Repeat("f", 40) + "\n")}, nil
+		case strings.Contains(joined, "status\x00--porcelain"), strings.Contains(joined, "merge-base"):
+			return GitResult{}, nil
+		default:
+			return GitResult{}, nil
+		}
+	}
+	items, err := ScanWithConfig(ScanConfig{Home: home, DataDir: data, Scope: subdir, Now: fixedNow, GitRunner: runner, GoCleaner: verifiedFakeGoCleaner(home)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range items {
+		if item.Family == "git-worktree" && strings.Contains(item.Label, "1") {
+			if item.Decision != BlockedActive || item.CurrentState != "current" {
+				t.Fatalf("subdirectory current detection = %#v", item)
+			}
+			return
+		}
+	}
+	t.Fatal("primary worktree candidate missing")
+}
+
+func TestLegacyUnknownSizeRoundTripIsConservative(t *testing.T) {
+	for _, candidate := range []Candidate{
+		{Family: "codex-runtime-cache", RootKind: "codex-runtime-cache", CurrentState: "activity-unproven"},
+		{Family: "git-worktree", RootKind: "git-worktree", CurrentState: "current"},
+		{Family: "homebrew-cache", RootKind: "homebrew-cache", CurrentState: "inventory-partial"},
+	} {
+		if candidate.SizeStatus() != SizeUnknown {
+			t.Fatalf("legacy unknown candidate status = %q for %#v", candidate.SizeStatus(), candidate)
+		}
+	}
+}
+
+func TestSuppliedIntegrationBaseResolvesLocallyWithoutFetch(t *testing.T) {
+	home, data := cacheFixture(t)
+	scope := filepath.Join(t.TempDir(), "primary")
+	linked := filepath.Join(t.TempDir(), "linked")
+	porcelain := "worktree " + scope + "\nHEAD primary\nbranch refs/heads/feature\n\n" +
+		"worktree " + linked + "\nHEAD linked\nbranch refs/heads/feature-two\n"
+	var calls []string
+	runner := func(args ...string) (GitResult, error) {
+		joined := strings.Join(args, "\x00")
+		calls = append(calls, joined)
+		switch {
+		case strings.Contains(joined, "worktree\x00list\x00--porcelain"):
+			return GitResult{Output: []byte(porcelain)}, nil
+		case strings.Contains(joined, "rev-parse"):
+			return GitResult{Output: []byte(strings.Repeat("d", 40) + "\n")}, nil
+		case strings.Contains(joined, "status\x00--porcelain"), strings.Contains(joined, "merge-base"):
+			return GitResult{}, nil
+		default:
+			return GitResult{}, nil
+		}
+	}
+	items, err := ScanWithConfig(ScanConfig{Home: home, DataDir: data, Scope: scope, IntegrationBase: "refs/heads/release", Now: fixedNow, GitRunner: runner, GoCleaner: verifiedFakeGoCleaner(home)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var linkedItem *Candidate
+	for i := range items {
+		if items[i].Family == "git-worktree" && strings.Contains(items[i].Label, "2") {
+			linkedItem = &items[i]
+		}
+	}
+	if linkedItem == nil || linkedItem.Decision != Review {
+		t.Fatalf("supplied base classification = %#v", linkedItem)
+	}
+	joined := strings.Join(calls, "\n")
+	if strings.Contains(joined, "for-each-ref") || strings.Contains(joined, "fetch") {
+		t.Fatalf("supplied base caused default/network lookup: %s", joined)
+	}
+	if !strings.Contains(joined, strings.Repeat("d", 40)) {
+		t.Fatalf("resolved commit was not used for ancestry: %s", joined)
+	}
+}
+
+func TestAmbiguousIntegrationBasePreservesUnknown(t *testing.T) {
+	home, data := cacheFixture(t)
+	scope := filepath.Join(t.TempDir(), "primary")
+	linked := filepath.Join(t.TempDir(), "linked")
+	porcelain := "worktree " + scope + "\nHEAD primary\nbranch refs/heads/feature\n\n" +
+		"worktree " + linked + "\nHEAD linked\nbranch refs/heads/feature-two\n"
+	runner := func(args ...string) (GitResult, error) {
+		joined := strings.Join(args, "\x00")
+		switch {
+		case strings.Contains(joined, "worktree\x00list\x00--porcelain"):
+			return GitResult{Output: []byte(porcelain)}, nil
+		case strings.Contains(joined, "for-each-ref"):
+			return GitResult{Output: []byte("refs/heads/main\nrefs/heads/master\n")}, nil
+		case strings.Contains(joined, "status\x00--porcelain"):
+			return GitResult{}, nil
+		default:
+			return GitResult{}, nil
+		}
+	}
+	items, err := ScanWithConfig(ScanConfig{Home: home, DataDir: data, Scope: scope, Now: fixedNow, GitRunner: runner, GoCleaner: verifiedFakeGoCleaner(home)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range items {
+		if item.Family == "git-worktree" && strings.Contains(item.Label, "2") {
+			if item.Decision != BlockedUnknown || item.CurrentState != "integration-base-unknown" || !strings.Contains(strings.Join(item.Reasons, " "), "ambiguous") {
+				t.Fatalf("ambiguous base = %#v", item)
+			}
+			return
+		}
+	}
+	t.Fatal("linked worktree candidate missing")
+}
+
+func TestSquashHistoryRemainsMergeUnproven(t *testing.T) {
+	home, data := cacheFixture(t)
+	scope := filepath.Join(t.TempDir(), "primary")
+	linked := filepath.Join(t.TempDir(), "linked")
+	porcelain := "worktree " + scope + "\nHEAD primary\nbranch refs/heads/feature\n\n" +
+		"worktree " + linked + "\nHEAD linked\nbranch refs/heads/feature-two\n"
+	runner := func(args ...string) (GitResult, error) {
+		joined := strings.Join(args, "\x00")
+		switch {
+		case strings.Contains(joined, "worktree\x00list\x00--porcelain"):
+			return GitResult{Output: []byte(porcelain)}, nil
+		case strings.Contains(joined, "for-each-ref"):
+			return GitResult{Output: []byte("refs/heads/main\n")}, nil
+		case strings.Contains(joined, "rev-parse"):
+			return GitResult{Output: []byte(strings.Repeat("e", 40) + "\n")}, nil
+		case strings.Contains(joined, "status\x00--porcelain"):
+			return GitResult{}, nil
+		case strings.Contains(joined, "merge-base"):
+			return GitResult{ExitCode: 1}, nil
+		default:
+			return GitResult{}, nil
+		}
+	}
+	items, err := ScanWithConfig(ScanConfig{Home: home, DataDir: data, Scope: scope, Now: fixedNow, GitRunner: runner, GoCleaner: verifiedFakeGoCleaner(home)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range items {
+		if item.Family == "git-worktree" && strings.Contains(item.Label, "2") {
+			if item.Decision != BlockedUnmerged || item.CurrentState != "merge-unproven" || !strings.Contains(strings.Join(item.Reasons, " "), "squash") {
+				t.Fatalf("squash history = %#v", item)
+			}
+			return
+		}
+	}
+	t.Fatal("linked worktree candidate missing")
+}
+
+func TestCandidateJSONShapeRemainsV1WithoutSizeStatus(t *testing.T) {
+	home, data := cacheFixture(t)
+	items, err := ScanWithConfig(ScanConfig{Home: home, DataDir: data, Now: fixedNow, GoCleaner: verifiedFakeGoCleaner(home)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(items[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(b, &raw); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"id", "family", "rule_version", "bytes", "decision", "reasons", "action", "reversible", "captured_at", "label", "fingerprint", "current_state", "root_kind"} {
+		if _, ok := raw[key]; !ok {
+			t.Fatalf("v1 key missing %q: %s", key, b)
+		}
+	}
+	if _, ok := raw["size_status"]; ok {
+		t.Fatalf("internal size status leaked into v1 JSON: %s", b)
+	}
 }
 
 func TestMixedAgentRootsAreNeverTraversedOrEmitted(t *testing.T) {
