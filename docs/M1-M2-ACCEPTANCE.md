@@ -59,3 +59,21 @@ Pilot feedback should record only opt-in aggregate outcomes: installation
 completed, time to first decision, useful or not useful, missing resource family,
 repeat use, and voluntarily supplied comments. No automatic telemetry, raw
 workspace paths, private reports or conversations are needed.
+
+## Source integration evidence, 8 September 2026
+
+M1 terminal evidence, explicit residue inventory/history, source capability
+negotiation, local Skill preparation, protection management and guarded
+user-managed worktree retirement are integrated in the candidate branch.
+
+Local checks passed: formatting, the full Go race-test suite, vet, a trimpath
+build, 74 distribution/Skill/privacy tests, shell syntax, and inspection of
+tracked files and the binary for real home/workspace strings. Native retirement
+and reconstruction were exercised only in disposable fixture repositories.
+
+Review fixes include stale-plan invalidation after unprotect, descriptor-bound
+single-link protection tombstones, guarded Git configuration and execution,
+Skill destination races, malformed/overfull history handling, and CLI disclosure
+of blocked retirement evidence. This records source verification, not a new
+release, independent security certification, live agent integration or pilot
+traction. The field and release gates above remain outstanding.

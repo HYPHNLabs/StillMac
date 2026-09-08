@@ -77,6 +77,12 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, deps Depe
 	}
 
 	switch args[0] {
+	case "retire":
+		return runRetireCommand(args, stdout, stderr, deps)
+	case "inspect", "snapshot", "changes", "session-report":
+		return runResidueCommand(args, stdout, stderr, deps)
+	case "capabilities":
+		return runCapabilities(args[1:], stdout, stderr)
 	case "protections", "unprotect":
 		return runProtectionCommand(args, stdout, stderr, deps)
 	case "doctor":
@@ -854,5 +860,23 @@ func writeUsage(writer io.Writer) {
        stillmac clean [IDs...|all] [--scope PATH] [--base REF] [--data-dir PATH]
        stillmac protect ID [--scope PATH] [--base REF] [--data-dir PATH]
        stillmac history [--data-dir PATH] [--format text|json]
+       stillmac protections [--data-dir PATH] [--format text|json]
+       stillmac unprotect ID [--data-dir PATH] [--format text|json]
+       stillmac capabilities [--format json]
+       stillmac inspect|snapshot [--scope PATH ...] [--format text|json] [--data-dir PATH]
+       stillmac changes [--from SNAPSHOT_ID] [--to SNAPSHOT_ID] [--format text|json] [--data-dir PATH]
+       stillmac session-report [--scope PATH ...] [--quiet] [--threshold-bytes N] [--format text|json] [--data-dir PATH]
+       stillmac retire plan --target PATH --user-managed --session-ended [--format text|json] [--data-dir PATH]
+       stillmac retire apply PLAN_ID [--format text|json] [--data-dir PATH]
+       stillmac retire register --target PATH --user-managed [--format text|json] [--data-dir PATH]
+       stillmac retire release REGISTRATION_ID --session-ended [--format text|json] [--data-dir PATH]
+       stillmac retire plan|protect|unprotect REGISTRATION_ID [--format text|json] [--data-dir PATH]
+       stillmac retire approve PLAN_ID [--format text|json] [--data-dir PATH]
+       stillmac retire recover RECEIPT_ID [--format text|json] [--data-dir PATH]
+       stillmac retire list|history [--format text|json] [--data-dir PATH]
+
+inspect, snapshot and session-report accept --max-items N, --max-depth N,
+--max-bytes N and --max-duration D (for example 5s). Reports describe their bounds.
+Source candidate commands require a source build; they are not in released v0.1.1.
 `)
 }

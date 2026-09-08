@@ -1,5 +1,10 @@
 # Developer cleanup contract
 
+This contract governs the cache command namespace. The M1/M2 source candidate
+also has separate [residue](RESIDUE-CONTRACT.md) and
+[worktree retirement](WORKTREE-RETIREMENT-CONTRACT.md) contracts. Those additions
+do not enable Git mutation through cache `apply` or `clean`.
+
 ## Product boundary
 
 Cleanup is local, deterministic, narrow, and approval-gated. `scan` discovers bounded candidates, `explain` expands one current row, `plan` snapshots selected SAFE IDs, and `apply` revalidates one owner-native Go cache action. `clean` is an interactive wrapper around the same flow. StillMac performs no direct cache filesystem mutation.
@@ -18,6 +23,8 @@ apply PLAN_ID [--data-dir PATH] [--format text|json]
 clean [IDs...|all] [--scope PATH] [--data-dir PATH]
 protect ID [--scope PATH] [--data-dir PATH]
 history [--data-dir PATH] [--format text|json]
+protections [--data-dir PATH] [--format text|json]
+unprotect ID [--data-dir PATH] [--format text|json]
 ```
 
 Options accept split or `--name=value` forms. Text scans number the current rows `1..N` while also showing each stable ID. Interactive `clean` may accept those fresh display numbers (for example `clean 1 3`) and maps them to IDs from the same scan; numbers are never persisted. `plan` accepts stable IDs or `all-safe` only; numeric selections are rejected. Unknown selections fail, and combining `all`/`all-safe` with explicit selections is rejected. `all-safe` includes every and only `SAFE` candidate and returns every non-SAFE row in `excluded`.
@@ -32,7 +39,7 @@ Production resolution does not trust inherited `PATH`, `GOENV`, or `GOCACHE`. It
 
 Codex runtime inventory never has an action. With no injected proof of inactivity it is `BLOCKED_ACTIVE`. With proof it is `REVIEW`. Whole mixed agent roots (`.codex`, `.claude`, `.hermes`), conversations, credentials, memories, skills, config, and Application Support are never traversed or emitted; their exclusion is the protection boundary.
 
-`--scope` adds project and worktree state. It never derives scope from the data directory and never treats `scope/go-build` as a cache. Git uses actual `git worktree list --porcelain`, then fixed per-worktree `status --porcelain` and reachability checks. Current or main and locked worktrees are `BLOCKED_ACTIVE`; dirty is `BLOCKED_DIRTY`; not proven merged is `BLOCKED_UNMERGED`; clean merged inactive is `REVIEW`; unavailable or prunable state is `BLOCKED_UNKNOWN`. Git actions are always `none`.
+`--scope` adds project and worktree state. It never derives scope from the data directory and never treats `scope/go-build` as a cache. Git uses actual `git worktree list --porcelain`, then fixed per-worktree `status --porcelain` and reachability checks. Current or main and locked worktrees are `BLOCKED_ACTIVE`; dirty is `BLOCKED_DIRTY`; not proven merged is `BLOCKED_UNMERGED`; clean merged state is `REVIEW` (inactivity is not inferred); unavailable or prunable state is `BLOCKED_UNKNOWN`. Git actions are always `none`.
 
 Candidate IDs are a truncated SHA-256 over family and a private stable key. JSON labels are generic. JSON and persisted public state exclude raw absolute HOME and scope paths, usernames, command arguments, and unrelated filenames.
 
@@ -62,7 +69,11 @@ The target registry contains schema, plan ID, actual host ID, registry hash, and
 
 ## Protection
 
-`protect` accepts only an ID discovered by a scan using the same current scope and rules. Private protection state records schema, stable ID, and family. Future scan returns `PROTECTED`; plan rejects it; apply rechecks protection and fails.
+`protect` accepts only an ID discovered by a scan using the same current scope and rules. Private protection state records schema, stable ID, family and an optional state. Future scan returns `PROTECTED`; plan rejects it; apply rechecks protection and fails.
+
+`protections` lists active exclusions without creating state. `unprotect ID` disables one exclusion through a validated same-user, single-link file descriptor and leaves an `unprotected` tombstone. It never unlinks a resource or private record through a replaceable parent pathname. It advances a private protection generation before writing the tombstone; target registries bind that generation, so pre-existing plans cannot become valid again after unprotect. A partial in-place tombstone write fails closed as malformed state. This is not an atomic defence against malicious same-UID mutation of all local state; the account/kernel trust boundary still applies.
+
+Legacy records without state remain protected and registries without generation represent generation zero. The released v0.1.1 binary does not understand the new private tombstones or generation file and will fail closed on that state. Use a separate data directory when evaluating a source build alongside it.
 
 ## Apply
 
@@ -79,7 +90,7 @@ Any difference is `BLOCKED_CHANGED` in the structured failure row and fails clos
 
 Approval authorizes `go clean -cache` against the logical exact GOCACHE pathname. Concurrent same-account hostile mutation is not defended; private target paths remain in private state only.
 
-The exact scanner measures before and after. `moved_bytes` is always `0`. `removed_bytes` and `reclaimed_bytes` are both `max(before_bytes-after_bytes, 0)`. Go build cache cleaning therefore reclaims measured disk space, at the cost of rebuilding cache entries during later builds.
+The exact scanner measures before and after. `moved_bytes` is always `0`. `removed_bytes` and `reclaimed_bytes` are both `max(before_bytes-after_bytes, 0)`. These legacy field names describe logical cache-tree byte reduction, not an independently measured increase in filesystem free space. Later builds may rebuild the entries.
 
 ## Receipts and history
 
@@ -107,3 +118,5 @@ Cleanup directories are `0700`; regular JSON is `0600`. Writes use a private tem
 - No Codex action.
 - No scheduler or end-session action. Future end-session automation may be scan-only and must never auto-clean.
 - No release, Homebrew, npx, or curl installation claim.
+
+The source candidate additionally supports `--base REF` (alias `--integration-base REF`) for an explicit locally resolved integration base. Missing ancestry evidence blocks the classification; no fetch occurs. See [M1 evidence](M1-EVIDENCE-CONTRACT.md) for legacy JSON size limits.
