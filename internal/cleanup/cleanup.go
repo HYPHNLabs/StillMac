@@ -164,17 +164,19 @@ type privateTarget struct {
 }
 
 type targetRegistry struct {
-	SchemaVersion string          `json:"schema_version"`
-	PlanID        string          `json:"plan_id"`
-	HostID        string          `json:"host_id"`
-	Hash          string          `json:"registry_hash"`
-	Targets       []privateTarget `json:"targets"`
+	SchemaVersion        string          `json:"schema_version"`
+	PlanID               string          `json:"plan_id"`
+	HostID               string          `json:"host_id"`
+	Hash                 string          `json:"registry_hash"`
+	ProtectionGeneration uint64          `json:"protection_generation,omitempty"`
+	Targets              []privateTarget `json:"targets"`
 }
 
 type protectionRecord struct {
 	SchemaVersion string `json:"schema_version"`
 	ID            string `json:"id"`
 	Family        string `json:"family"`
+	State         string `json:"state,omitempty"`
 }
 
 type hostRecord struct {
@@ -646,7 +648,11 @@ func (e *Engine) Plan(items []Candidate, ids []string) (Plan, error) {
 	if err != nil {
 		return Plan{}, err
 	}
-	reg := targetRegistry{SchemaVersion: schemaVersion, HostID: hostID}
+	protectionGeneration, err := readProtectionGeneration(e.cleanupDir())
+	if err != nil {
+		return Plan{}, err
+	}
+	reg := targetRegistry{SchemaVersion: schemaVersion, HostID: hostID, ProtectionGeneration: protectionGeneration}
 	for _, c := range selected {
 		path, ok := supportedPath(home, c)
 		if !ok {
@@ -736,6 +742,13 @@ func (e *Engine) Apply(id string) (ApplyResult, error) {
 	}
 	if p.HostBinding != opaqueHash(hostID) || reg.HostID != hostID {
 		return result, errors.New("plan host mismatch")
+	}
+	protectionGeneration, err := readProtectionGeneration(e.cleanupDir())
+	if err != nil {
+		return result, err
+	}
+	if reg.ProtectionGeneration != protectionGeneration {
+		return result, errors.New("protection state changed; create a fresh plan")
 	}
 	protected, err := readProtected(e.cleanupDir())
 	if err != nil {
@@ -973,6 +986,19 @@ func (e *Engine) validateState() error {
 			}
 			continue
 		}
+		if entry.Name() == protectionGenerationFile {
+			if entry.Type()&os.ModeSymlink != 0 || !entry.Type().IsRegular() {
+				return errors.New("unsafe protection generation")
+			}
+			info, infoErr := entry.Info()
+			if infoErr != nil || info.Mode().Perm() != 0o600 {
+				return errors.New("unsafe protection generation")
+			}
+			if _, generationErr := readProtectionGeneration(e.cleanupDir()); generationErr != nil {
+				return errors.New("malformed protection generation")
+			}
+			continue
+		}
 		return errors.New("unknown cleanup entry")
 	}
 	for _, name := range []string{"plans", "targets", "protected", "receipts"} {
@@ -1093,8 +1119,11 @@ func readProtected(cleanupDir string) (map[string]string, error) {
 		if err := readStrictJSON(filepath.Join(dir, entry.Name()), &r); err != nil {
 			return nil, err
 		}
-		if r.SchemaVersion != schemaVersion || !validCandidateID(r.ID) || r.Family == "" || entry.Name() != r.ID+".json" || !familyMatchesID(r.ID, r.Family) {
+		if r.SchemaVersion != schemaVersion || !validCandidateID(r.ID) || r.Family == "" || entry.Name() != r.ID+".json" || !familyMatchesID(r.ID, r.Family) || (r.State != "" && r.State != "protected" && r.State != "unprotected") {
 			return nil, errors.New("malformed protection")
+		}
+		if r.State == "unprotected" {
+			continue
 		}
 		out[r.ID] = r.Family
 	}
