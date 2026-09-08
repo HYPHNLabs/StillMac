@@ -12,7 +12,6 @@ import (
 	"io/fs"
 	"math"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -404,18 +403,7 @@ func inspectWorktreesWithBase(scope string, now time.Time, runner GitRunner, sup
 		return nil, err
 	}
 	if runner == nil {
-		runner = func(args ...string) (GitResult, error) {
-			cmd := exec.Command("git", args...)
-			out, err := cmd.Output()
-			if err == nil {
-				return GitResult{Output: out, ExitCode: 0}, nil
-			}
-			var exitErr *exec.ExitError
-			if errors.As(err, &exitErr) {
-				return GitResult{Output: exitErr.Stderr, ExitCode: exitErr.ExitCode()}, nil
-			}
-			return GitResult{}, err
-		}
+		runner = NativeInventoryGitRunner
 	}
 	result, err := runner("-C", absScope, "worktree", "list", "--porcelain")
 	if err != nil {
