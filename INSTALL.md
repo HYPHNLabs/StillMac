@@ -90,3 +90,14 @@ sh /tmp/stillmac-uninstall.sh
 ```
 
 Uninstall removes only `$HOME/.local/bin/stillmac`. Private StillMac data is retained for user-controlled inspection. The PATH entry is harmless after uninstall; you may remove the StillMac export line from the profile file you chose during setup.
+
+## M1/M2 source candidate and Agent Skill
+
+The pinned v0.1.1 installer does not install the new residue or retirement
+commands. Build the reviewed source to try them and inspect
+`./bin/stillmac capabilities --format json`. A source profile is not a release.
+See the [Agent workflow](docs/AGENT-WORKFLOW.md) for local Skill preparation,
+capability negotiation and explicit approval. No runtime update, provider hook
+or background service is installed by the Skill preparation script.
+
+Use a separate `--data-dir` when testing the source candidate alongside v0.1.1. New private protection state is intentionally not readable by the old binary.

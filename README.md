@@ -8,6 +8,8 @@ StillMac helps Mac developers record point-in-time process and memory measuremen
 
 It runs locally and can clean one thing in this beta: the exact Go build cache, after showing a short-lived plan and asking for explicit approval. It is not a general-purpose Mac cleaner.
 
+The [M1 and M2 source candidate](#m1-and-m2-source-candidate) adds explicit residue reports and guarded worktree retirement. The public installer still installs v0.1.1.
+
 ## Who StillMac is for
 
 StillMac is for Mac developers who use tools such as Go, Homebrew, Git worktrees, or Codex and want evidence before cleanup.
@@ -20,7 +22,7 @@ You can use it to:
 - clean an eligible Go build cache after approval;
 - keep a private local receipt of the measured result.
 
-Homebrew caches, Codex runtimes, and Git worktrees remain inventory-only. StillMac never cleans them.
+In v0.1.1, Homebrew caches, Codex runtimes, and Git worktrees remain inventory-only. The source candidate retains Homebrew and Codex exclusions; its separate retirement contract governs user-managed linked worktrees.
 
 ## Public beta limits
 
@@ -107,11 +109,11 @@ Example only. Your sizes and IDs will differ.
 
 ## What StillMac can change
 
-The only active cleanup action is the verified owner-native command `go clean -cache` for the exact Go build cache. StillMac performs revalidation immediately before invoking it, then writes a receipt with the measured bytes before and after the action.
+In v0.1.1 and the source candidate cache namespace, the only active cleanup action is the verified owner-native command `go clean -cache` for the exact Go build cache. StillMac performs revalidation immediately before invoking it, then writes a receipt with the measured bytes before and after the action.
 
 Cleaning the Go build cache can free disk space, but later Go builds may take longer while cache entries are rebuilt.
 
-StillMac does not delete Homebrew caches, Codex runtimes, or Git worktrees. It does not scan arbitrary locations, terminate processes, elevate privileges, run in the background, or provide generic path deletion.
+The released v0.1.1 binary does not delete Homebrew caches, Codex runtimes, or Git worktrees. It does not scan arbitrary locations, terminate processes, elevate privileges, run in the background, or provide generic path deletion.
 
 ## Process and memory snapshots
 
@@ -151,7 +153,7 @@ To add path-free Git worktree inventory for one project:
 stillmac scan --scope /path/to/project --format text
 ```
 
-Providing a project scope adds inventory only. StillMac never performs a Git cleanup action.
+In this released command flow, providing a project scope adds inventory only. `scan`, `plan`, `apply` and `clean` never perform a Git cleanup action.
 
 ## Upgrade
 
@@ -186,6 +188,39 @@ go build -buildvcs=false -trimpath -o ./bin/stillmac ./cmd/stillmac
 ```
 
 The `./bin/stillmac` path applies only to this source-build route.
+
+## M1 and M2 source candidate
+
+The published installer below still installs **v0.1.1**. This branch develops a
+separate source candidate for developers whose coding sessions leave caches and
+worktrees behind. Build from source to try these commands; no new release or
+live agent compatibility is claimed. Use a separate `--data-dir` when testing alongside v0.1.1; the old binary rejects new private protection state.
+
+```bash
+./bin/stillmac capabilities --format json
+./bin/stillmac inspect --scope /absolute/project --format text
+./bin/stillmac snapshot --scope /absolute/project
+# After another development session, using the same scope:
+./bin/stillmac snapshot --scope /absolute/project
+./bin/stillmac changes
+./bin/stillmac session-report --scope /absolute/project --quiet
+```
+
+M1 explains measured size, missing evidence and available actions. Project
+inspection is explicit and limited to supported artifact families. M2 compares
+local snapshots and provides a separate guarded retirement flow for registered,
+user-managed linked worktrees. A clean or merged worktree is not proof that its
+coding session has ended. Agent-managed worktrees remain protected.
+
+For retirement, first read the [retirement contract](docs/WORKTREE-RETIREMENT-CONTRACT.md).
+Planning requires your explicit ownership and session-end attestations. Review
+the exact plan before invoking `retire apply PLAN_ID`. Restoration reconstructs
+tracked Git content under the contract's checks; it is not a backup of local data.
+
+The [Agent workflow](docs/AGENT-WORKFLOW.md) uses the same CLI and requires human
+approval before action. The [milestone acceptance gates](docs/M1-M2-ACCEPTANCE.md)
+separate implemented behaviour from field evidence. The pilot and repeat-use
+results are not yet measured.
 
 ## Privacy
 

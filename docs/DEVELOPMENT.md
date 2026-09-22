@@ -22,6 +22,8 @@ go build -buildvcs=false -trimpath -o ./bin/stillmac ./cmd/stillmac
 gofmt -w .
 go test -count=1 -race ./...
 go vet ./...
+python3 -m unittest -v tests/test_distribution.py tests/test_skill_distribution.py tests/test_public_residue.py
+sh -n scripts/*.sh scripts/install.sh.tmpl
 ```
 
 ## Release build
@@ -54,3 +56,10 @@ For any production behaviour change:
 ## Local Git boundary
 
 Local commits are allowed for the clean candidate package. Private planning PRDs, build artifacts, runtime state, editor settings, and environment files are ignored. A remote, push, tag, release, licence claim, or publication requires a separate explicit decision.
+
+## Milestone fixtures
+
+Retirement tests create disposable Git repositories and perform native removal
+and reconstruction only there. Never run destructive smoke tests against a
+user's real worktrees or caches. Residue snapshots use synthetic temporary
+scopes. Keep field-pilot results, source checks and release claims separate.

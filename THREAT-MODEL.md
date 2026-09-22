@@ -2,7 +2,7 @@
 
 ## Scope
 
-This model covers baseline commands, the developer cleanup commands `scan`, `explain`, `plan`, `apply`, `clean`, `protect`, and `history`, and the direct `v0.1.1` GitHub Release installer. Homebrew and Agent Skill distribution remain inactive.
+This model covers baseline commands, the developer cleanup commands `scan`, `explain`, `plan`, `apply`, `clean`, `protect`, and `history`, and the direct `v0.1.1` GitHub Release installer. Homebrew publication remains inactive. Local Agent Skill preparation and the separate M1/M2 source contracts are described below.
 
 ## Protected assets
 
@@ -35,7 +35,7 @@ Selected state or target parents could redirect inspection. StillMac rejects sym
 
 ### Over-broad action
 
-An inventory rule could become an executable action. Only verified Go build cache rows can map to `owner-native-go-clean-cache`. Homebrew, Git, and Codex actions are `none`. There is no shell, recursive removal, force flag, raw plan path execution, arbitrary target, or cache-root rename.
+An inventory rule could become an executable action. Only verified Go build cache rows can map to `owner-native-go-clean-cache`. Within the cache command namespace, Homebrew, Git, and Codex actions are `none`. There is no shell, recursive removal, force flag, raw plan path execution, arbitrary target, or cache-root rename.
 
 ### False free-space claim
 
@@ -51,14 +51,40 @@ Each attempted row gets an atomic receipt with success or failure. Apply returns
 
 ### Supply chain
 
-The source installer fails closed. The direct release installer is pinned to the reviewed `v0.1.1` manifest digest and verifies the Apple Silicon archive before installation. Homebrew and Agent Skill routes remain inactive. Signing and notarisation are not claimed.
+The source installer fails closed. The direct release installer is pinned to the reviewed `v0.1.1` manifest digest and verifies the Apple Silicon archive before installation. Homebrew publication remains inactive; source-only Skill preparation is a separate explicitly selected local operation. Signing and notarisation are not claimed.
 
 ## Residual risks
 
 - Equivalent-user malware can read or mutate local state and cache data.
 - Malicious same-UID concurrent replacement of the Go executable or logical GOCACHE pathname is out of scope and can race the final checks, `execve`, or Go pathname resolution. Fixed absolute executable selection, fingerprints, exact GOCACHE, fixed arguments, and sanitized environment are defense-in-depth, not an atomic guarantee. No cache source-name rename remains.
 - Go cache cleaning can increase the cost of later builds while cache entries are rebuilt.
-- Git reachability is evaluated against local `main`; stale refs can make inventory conservative or incomplete.
+- Git reachability uses locally resolved integration-base evidence; stale or unavailable refs can make inventory conservative or incomplete.
 - The public beta is Apple Silicon only and has been executed on macOS 26.5. Other macOS versions are not yet verified runtime claims.
 
 Future end-session automation may scan only. Auto-clean, scheduler state, new roots, or network behaviour requires a new contract and threat review.
+
+## M1/M2 source candidate
+
+Residue inventory adds no cleanup primitive. It measures only supported artifact
+families in explicit scopes, uses opaque IDs and bounded private snapshots, and
+refuses to derive reductions from missing or incompatible evidence. Logical
+shrink is not a measurement of filesystem free space. Metadata worktree listing
+uses fixed Git execution with bounded output and time. Status and ancestry probes
+refuse configured helpers and partial-clone configuration; no inherited PATH or
+Git configuration injection is used.
+
+Retirement has separate registration, target, plan, approval and receipt schemas.
+It permits only native Git removal of an explicitly registered user-managed
+linked worktree after both owner attestation and fresh machine checks. An
+attestation is not machine evidence of inactivity. Main, current, locked,
+dirty, untracked, ignored, agent-managed and otherwise unsupported targets
+remain blocked. Restoration is a tracked checkout reconstruction, conditional
+on the preserved local commit/ref and an unoccupied exact root. The
+[retirement contract](docs/WORKTREE-RETIREMENT-CONTRACT.md) describes remaining
+same-account race and recovery limits. Fixture tests do not prove live agent
+integration or universal Mac compatibility.
+
+Skill preparation validates a version-bound supplied source and claims an
+explicit new destination without replacing an existing installation. It is
+local-only and installs neither runtime nor hooks. Agent instructions cannot
+replace deterministic CLI checks or human approval of the exact action plan.

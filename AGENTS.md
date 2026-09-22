@@ -4,7 +4,7 @@
 
 StillMac v0.1 is a local, deterministic process and memory baseline plus an approval-gated developer-cache cleanup slice for macOS.
 
-The current beta candidate contains only:
+The published v0.1.1 beta contains only:
 
 - one safe process collector;
 - macOS memory-pressure and swap inputs;
@@ -16,14 +16,18 @@ The current beta candidate contains only:
 - path-free Git worktree inventory with no Git cleanup action;
 - non-executable Codex runtime inventory.
 
-Do not broaden cleanup beyond `docs/DEVELOPER-CLEANUP-CONTRACT.md`. Do not add a scheduler, runtime installer/updater, client adapter, standalone port analysis, process termination, arbitrary deletion, cache-root rename, telemetry, cloud service, networking, or LLM dependency without a separately approved contract.
+The authorised M1/M2 source candidate adds only the bounded behaviour in `docs/M1-EVIDENCE-CONTRACT.md`, `docs/RESIDUE-CONTRACT.md` and `docs/WORKTREE-RETIREMENT-CONTRACT.md`, plus local Skill preparation. This is not a release or permission to act on real user resources.
+
+Do not broaden cleanup beyond those contracts and `docs/DEVELOPER-CLEANUP-CONTRACT.md`. Do not add a scheduler, runtime installer/updater, client adapter, standalone port analysis, process termination, arbitrary deletion, cache-root rename, telemetry, cloud service, networking, or LLM dependency without a separately approved contract.
 
 ## Privacy and safety
 
 - Collect only explicitly allowlisted fields.
 - Never collect command arguments, environment variables, full executable paths, workspace paths/names, usernames, unrelated filenames, file contents, clipboard, browser data, agent conversations, tokens, or credentials.
 - Report temporal association only. Never claim a process caused memory pressure.
-- The only active action is approval-gated invocation of a verified owner-native Go tool as absolute `go clean -cache` for the exact Go build cache.
+- In the cache namespace, the only active action is approval-gated invocation of a verified owner-native Go tool as absolute `go clean -cache` for the exact Go build cache.
+- Git retirement and reconstruction require the separate retirement contract, explicit registration and exact approval. Agent-managed worktrees remain excluded.
+- Private target bindings may retain the exact paths needed by those contracts; public output must remain path-free.
 - Store data locally with restrictive permissions and fail closed on unsafe state.
 
 ## Engineering

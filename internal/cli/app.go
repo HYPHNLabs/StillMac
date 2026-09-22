@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -76,6 +77,14 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, deps Depe
 	}
 
 	switch args[0] {
+	case "retire":
+		return runRetireCommand(args, stdout, stderr, deps)
+	case "inspect", "snapshot", "changes", "session-report":
+		return runResidueCommand(args, stdout, stderr, deps)
+	case "capabilities":
+		return runCapabilities(args[1:], stdout, stderr)
+	case "protections", "unprotect":
+		return runProtectionCommand(args, stdout, stderr, deps)
 	case "doctor":
 		dataDir, err := commandDataDir(args[1:], deps.DefaultDataDir)
 		if errors.Is(err, errDefaultDataDir) {
@@ -193,7 +202,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, deps Depe
 			io.WriteString(stderr, "stillmac: invalid scan options\n")
 			return ExitUsage
 		}
-		engine, err := cleanupService(deps, opts.dataDir)
+		engine, err := cleanupService(deps, opts.dataDir, opts.integrationBase)
 		if err != nil {
 			io.WriteString(stderr, "stillmac: scan unavailable\n")
 			return ExitState
@@ -221,7 +230,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, deps Depe
 			io.WriteString(stderr, "stillmac: invalid plan options\n")
 			return ExitUsage
 		}
-		engine, err := cleanupService(deps, opts.dataDir)
+		engine, err := cleanupService(deps, opts.dataDir, opts.integrationBase)
 		if err != nil {
 			io.WriteString(stderr, "stillmac: plan unavailable\n")
 			return ExitState
@@ -256,7 +265,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, deps Depe
 			io.WriteString(stderr, "stillmac: invalid apply options\n")
 			return ExitUsage
 		}
-		engine, err := cleanupService(deps, opts.dataDir)
+		engine, err := cleanupService(deps, opts.dataDir, opts.integrationBase)
 		if err != nil {
 			io.WriteString(stderr, "stillmac: apply unavailable\n")
 			return ExitState
@@ -282,7 +291,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, deps Depe
 			io.WriteString(stderr, "stillmac: invalid explain options\n")
 			return ExitUsage
 		}
-		engine, err := cleanupService(deps, opts.dataDir)
+		engine, err := cleanupService(deps, opts.dataDir, opts.integrationBase)
 		if err != nil {
 			return ExitState
 		}
@@ -295,7 +304,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, deps Depe
 				if opts.format == "json" {
 					err = writeJSON(stdout, c)
 				} else {
-					err = writeCandidateText(stdout, c)
+					err = writeCandidateExplainText(stdout, c)
 				}
 				if err != nil {
 					return ExitReport
@@ -311,7 +320,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, deps Depe
 			io.WriteString(stderr, "stillmac: invalid protect options\n")
 			return ExitUsage
 		}
-		engine, err := cleanupService(deps, opts.dataDir)
+		engine, err := cleanupService(deps, opts.dataDir, opts.integrationBase)
 		if err != nil {
 			return ExitState
 		}
@@ -362,11 +371,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, deps Depe
 			io.WriteString(stderr, "stillmac: clean refuses non-TTY input; use plan then apply\n")
 			return ExitUsage
 		}
-		ids := opts.positionals
-		if len(ids) == 0 || len(ids) == 1 && ids[0] == "all" {
-			ids = []string{"all-safe"}
-		}
-		engine, err := cleanupService(deps, opts.dataDir)
+		engine, err := cleanupService(deps, opts.dataDir, opts.integrationBase)
 		if err != nil {
 			return ExitState
 		}
@@ -374,14 +379,65 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, deps Depe
 		if err != nil {
 			return ExitState
 		}
-		if len(opts.positionals) > 0 && !(len(opts.positionals) == 1 && opts.positionals[0] == "all") {
+		if err = writeCandidatesText(stdout, items); err != nil {
+			return ExitReport
+		}
+		safeCount := 0
+		for _, item := range items {
+			if item.Decision == cleanup.Safe {
+				safeCount++
+			}
+		}
+		bare := len(opts.positionals) == 0
+		allSafe := len(opts.positionals) == 1 && (opts.positionals[0] == "all" || opts.positionals[0] == "all-safe")
+		var ids []string
+		var inputReader *bufio.Reader
+		if bare {
+			if safeCount == 0 {
+				_, err = io.WriteString(stdout, "no eligible SAFE candidates; nothing to clean\n")
+				if err != nil {
+					return ExitReport
+				}
+				return ExitOK
+			}
+			if _, err = io.WriteString(stdout, "select candidates by number or ID, or type all for all SAFE candidates: "); err != nil {
+				return ExitReport
+			}
+			stdin := deps.Stdin
+			if stdin == nil {
+				stdin = os.Stdin
+			}
+			inputReader = bufio.NewReader(stdin)
+			ids, err = readCleanSelection(inputReader)
+			if err != nil {
+				io.WriteString(stderr, "stillmac: clean selection not received; nothing changed\n")
+				return ExitUsage
+			}
+			if len(ids) == 0 {
+				io.WriteString(stdout, "no action requested; nothing changed\n")
+				return ExitOK
+			}
+			allSafe = len(ids) == 1 && ids[0] == "all-safe"
+			if !allSafe {
+				ids, err = mapDisplayedSelections(items, ids)
+				if err != nil {
+					return ExitUsage
+				}
+			}
+		} else if allSafe {
+			if safeCount == 0 {
+				_, err = io.WriteString(stdout, "no eligible SAFE candidates; nothing to clean\n")
+				if err != nil {
+					return ExitReport
+				}
+				return ExitOK
+			}
+			ids = []string{"all-safe"}
+		} else {
 			ids, err = mapDisplayedSelections(items, opts.positionals)
 			if err != nil {
 				return ExitUsage
 			}
-		}
-		if err = writeCandidatesText(stdout, items); err != nil {
-			return ExitReport
 		}
 		p, err := engine.Plan(items, ids)
 		if err != nil {
@@ -398,7 +454,10 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, deps Depe
 		if stdin == nil {
 			stdin = os.Stdin
 		}
-		line, readErr := bufio.NewReader(stdin).ReadString('\n')
+		if inputReader == nil {
+			inputReader = bufio.NewReader(stdin)
+		}
+		line, readErr := inputReader.ReadString('\n')
 		if readErr != nil && len(line) == 0 {
 			io.WriteString(stderr, "stillmac: confirmation not received\n")
 			return ExitUsage
@@ -427,10 +486,11 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, deps Depe
 }
 
 type cleanupOptions struct {
-	positionals []string
-	scope       string
-	dataDir     string
-	format      string
+	positionals     []string
+	scope           string
+	integrationBase string
+	dataDir         string
+	format          string
 }
 
 func parseCleanupOptions(args []string, allowScope, allowData, allowFormat bool) (cleanupOptions, error) {
@@ -461,6 +521,11 @@ func parseCleanupOptions(args []string, allowScope, allowData, allowFormat bool)
 				return o, errInvalidOptions
 			}
 			o.scope = value
+		case "--base", "--integration-base":
+			if !allowScope {
+				return o, errInvalidOptions
+			}
+			o.integrationBase = value
 		case "--data-dir":
 			if !allowData {
 				return o, errInvalidOptions
@@ -481,7 +546,7 @@ func parseCleanupOptions(args []string, allowScope, allowData, allowFormat bool)
 	return o, nil
 }
 
-func cleanupService(deps Dependencies, dataDir string) (CleanupService, error) {
+func cleanupService(deps Dependencies, dataDir string, integrationBase ...string) (CleanupService, error) {
 	if dataDir == "" {
 		var err error
 		dataDir, err = commandDataDir(nil, deps.DefaultDataDir)
@@ -501,7 +566,11 @@ func cleanupService(deps Dependencies, dataDir string) (CleanupService, error) {
 	if deps.CleanupHostID != nil {
 		host = deps.CleanupHostID()
 	}
-	config := cleanup.Config{Home: home, DataDir: dataDir, HostID: host, Now: deps.Now, GitRunner: deps.GitRunner, GoCleaner: deps.GoCleaner}
+	base := ""
+	if len(integrationBase) > 0 {
+		base = integrationBase[0]
+	}
+	config := cleanup.Config{Home: home, DataDir: dataDir, IntegrationBase: base, HostID: host, Now: deps.Now, GitRunner: deps.GitRunner, GoCleaner: deps.GoCleaner}
 	if deps.CleanupFactory != nil {
 		return deps.CleanupFactory(config), nil
 	}
@@ -509,7 +578,7 @@ func cleanupService(deps Dependencies, dataDir string) (CleanupService, error) {
 }
 
 func writeCandidateText(w io.Writer, c cleanup.Candidate) error {
-	_, err := fmt.Fprintf(w, "%s %s %s %d bytes: %s\n", c.ID, c.Decision, c.Label, c.Bytes, strings.Join(c.Reasons, "; "))
+	_, err := fmt.Fprintf(w, "%s %s %s size=%s: %s\n", c.ID, c.Decision, c.Label, candidateSizeText(c), strings.Join(c.Reasons, "; "))
 	return err
 }
 func writeCandidatesText(w io.Writer, items []cleanup.Candidate) error {
@@ -521,7 +590,136 @@ func writeCandidatesText(w io.Writer, items []cleanup.Candidate) error {
 			return err
 		}
 	}
-	return nil
+	return writeCandidateTotals(w, items)
+}
+
+func candidateSizeText(c cleanup.Candidate) string {
+	size := formatByteCount(c.Bytes)
+	switch c.SizeStatus() {
+	case cleanup.SizePartial:
+		return "at least " + size + " (partial)"
+	case cleanup.SizeUnknown:
+		return "unknown"
+	default:
+		return size + " (exact)"
+	}
+}
+
+func formatByteCount(value int64) string {
+	if value < 0 {
+		return "unknown"
+	}
+	units := []string{"B", "KiB", "MiB", "GiB", "TiB", "PiB"}
+	amount := float64(value)
+	unitIndex := 0
+	for amount >= 1024 && unitIndex < len(units)-1 {
+		amount /= 1024
+		unitIndex++
+	}
+	if unitIndex == 0 {
+		return fmt.Sprintf("%d B", value)
+	}
+	return fmt.Sprintf("%.1f %s", amount, units[unitIndex])
+}
+
+func writeCandidateTotals(w io.Writer, items []cleanup.Candidate) error {
+	var exactTotal, partialTotal int64
+	exactCount, partialCount, unknownCount := 0, 0, 0
+	for _, c := range items {
+		switch c.SizeStatus() {
+		case cleanup.SizePartial:
+			partialCount++
+			if c.Bytes >= 0 {
+				if partialTotal > math.MaxInt64-c.Bytes {
+					partialTotal = math.MaxInt64
+				} else {
+					partialTotal += c.Bytes
+				}
+			}
+		case cleanup.SizeUnknown:
+			unknownCount++
+		default:
+			exactCount++
+			if c.Bytes >= 0 {
+				if exactTotal > math.MaxInt64-c.Bytes {
+					exactTotal = math.MaxInt64
+				} else {
+					exactTotal += c.Bytes
+				}
+			}
+		}
+	}
+	_, err := fmt.Fprintf(w, "totals: exact=%s (%d candidates); partial=%s (%d candidates, not included); unknown=%d (not included)\n", formatByteCount(exactTotal), exactCount, formatByteCount(partialTotal), partialCount, unknownCount)
+	return err
+}
+
+func writeCandidateExplainText(w io.Writer, c cleanup.Candidate) error {
+	if err := writeCandidateText(w, c); err != nil {
+		return err
+	}
+	reasons := strings.Join(c.Reasons, "; ")
+	if reasons == "" {
+		reasons = "none recorded"
+	}
+	if _, err := fmt.Fprintf(w, "evidence: %s; state=%s; size=%s\n", reasons, c.CurrentState, candidateSizeText(c)); err != nil {
+		return err
+	}
+	action := "unavailable: no bounded action is available"
+	if c.Action != "" && c.Action != "none" {
+		action = "available: " + c.Action
+	}
+	if _, err := fmt.Fprintf(w, "action availability: %s\n", action); err != nil {
+		return err
+	}
+	missing := "none identified by this scan"
+	switch c.Decision {
+	case cleanup.Review:
+		missing = "a bounded approval-gated action is not available"
+	case cleanup.BlockedActive:
+		missing = "the current or activity safety check is not satisfied"
+	case cleanup.BlockedDirty:
+		missing = "the clean-worktree check is not satisfied"
+	case cleanup.BlockedUnmerged:
+		missing = "ancestry was not proven; squash history is not inferred"
+	case cleanup.BlockedUnknown:
+		missing = "a required inventory, ownership, or integration-base check is unavailable"
+	case cleanup.Protected:
+		missing = "the candidate is protected by local state"
+	}
+	if _, err := fmt.Fprintf(w, "missing checks: %s\n", missing); err != nil {
+		return err
+	}
+	tradeoff := "not applicable: no cache action is available"
+	if c.Family == "go-build-cache" {
+		tradeoff = "logical cache reduction is measured before and after; filesystem free-space is not measured, and later Go builds may rebuild cache entries"
+	}
+	_, err := fmt.Fprintf(w, "rebuild trade-off: %s\n", tradeoff)
+	return err
+}
+
+func readCleanSelection(r io.Reader) ([]string, error) {
+	line, err := bufio.NewReader(r).ReadString('\n')
+	if err != nil && len(line) == 0 {
+		return nil, err
+	}
+	selections := strings.Fields(line)
+	if len(selections) == 0 {
+		return nil, errors.New("empty clean selection")
+	}
+	if len(selections) == 1 {
+		switch selections[0] {
+		case "all", "all-safe":
+			return []string{"all-safe"}, nil
+		case "none", "cancel":
+			return []string{}, nil
+		}
+	}
+	for _, selection := range selections {
+		if selection == "all" || selection == "all-safe" || selection == "none" || selection == "cancel" {
+			return nil, errors.New("mixed clean selection")
+		}
+	}
+	return selections, nil
 }
 func mapDisplayedSelections(items []cleanup.Candidate, selections []string) ([]string, error) {
 	byNumber := make(map[string]string, len(items))
@@ -555,7 +753,7 @@ func writePlanText(w io.Writer, p cleanup.Plan) error {
 	return nil
 }
 func writeApplyText(w io.Writer, r cleanup.ApplyResult) error {
-	if _, err := io.WriteString(w, "warning: approval authorizes go clean -cache for the exact logical GOCACHE pathname; concurrent same-account hostile replacement is outside StillMac's protection boundary\n"); err != nil {
+	if _, err := io.WriteString(w, "warning: approval authorizes go clean -cache for the exact logical GOCACHE pathname; removed and reclaimed values are logical cache-tree byte reductions, not verified filesystem free-space changes; concurrent same-account hostile replacement is outside StillMac's protection boundary\n"); err != nil {
 		return err
 	}
 	for _, row := range r.Rows {
@@ -568,6 +766,9 @@ func writeApplyText(w io.Writer, r cleanup.ApplyResult) error {
 func writeReceiptsText(w io.Writer, rows []cleanup.Receipt) error {
 	if len(rows) == 0 {
 		_, err := io.WriteString(w, "no cleanup receipts\n")
+		return err
+	}
+	if _, err := io.WriteString(w, "note: removed and reclaimed are logical cache-tree byte reductions, not verified filesystem free-space changes\n"); err != nil {
 		return err
 	}
 	for _, row := range rows {
@@ -652,12 +853,30 @@ func writeJSON(writer io.Writer, value any) error {
 
 func writeUsage(writer io.Writer) {
 	io.WriteString(writer, `usage: stillmac <doctor|sample|status|report> [options]
-       stillmac scan [--scope PATH] [--format text|json]
-       stillmac explain ID [--scope PATH] [--format text|json]
-       stillmac plan ID... | plan all-safe [--scope PATH] [--data-dir PATH] [--format text|json]
+       stillmac scan [--scope PATH] [--base REF] [--format text|json]
+       stillmac explain ID [--scope PATH] [--base REF] [--format text|json]
+       stillmac plan ID... | plan all-safe [--scope PATH] [--base REF] [--data-dir PATH] [--format text|json]
        stillmac apply PLAN_ID [--data-dir PATH] [--format text|json]
-       stillmac clean [IDs...|all] [--scope PATH] [--data-dir PATH]
-       stillmac protect ID [--scope PATH] [--data-dir PATH]
+       stillmac clean [IDs...|all] [--scope PATH] [--base REF] [--data-dir PATH]
+       stillmac protect ID [--scope PATH] [--base REF] [--data-dir PATH]
        stillmac history [--data-dir PATH] [--format text|json]
+       stillmac protections [--data-dir PATH] [--format text|json]
+       stillmac unprotect ID [--data-dir PATH] [--format text|json]
+       stillmac capabilities [--format json]
+       stillmac inspect|snapshot [--scope PATH ...] [--format text|json] [--data-dir PATH]
+       stillmac changes [--from SNAPSHOT_ID] [--to SNAPSHOT_ID] [--format text|json] [--data-dir PATH]
+       stillmac session-report [--scope PATH ...] [--quiet] [--threshold-bytes N] [--format text|json] [--data-dir PATH]
+       stillmac retire plan --target PATH --user-managed --session-ended [--format text|json] [--data-dir PATH]
+       stillmac retire apply PLAN_ID [--format text|json] [--data-dir PATH]
+       stillmac retire register --target PATH --user-managed [--format text|json] [--data-dir PATH]
+       stillmac retire release REGISTRATION_ID --session-ended [--format text|json] [--data-dir PATH]
+       stillmac retire plan|protect|unprotect REGISTRATION_ID [--format text|json] [--data-dir PATH]
+       stillmac retire approve PLAN_ID [--format text|json] [--data-dir PATH]
+       stillmac retire recover RECEIPT_ID [--format text|json] [--data-dir PATH]
+       stillmac retire list|history [--format text|json] [--data-dir PATH]
+
+inspect, snapshot and session-report accept --max-items N, --max-depth N,
+--max-bytes N and --max-duration D (for example 5s). Reports describe their bounds.
+Source candidate commands require a source build; they are not in released v0.1.1.
 `)
 }

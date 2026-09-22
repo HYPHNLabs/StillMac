@@ -15,7 +15,7 @@ StillMac/
     └── receipts/             success and failure action receipts
 ```
 
-Selected data and cleanup directories use `0700`; regular JSON uses `0600`. State readers reject links, non-regular files, unsafe permissions, malformed schemas, and unknown entries. Reports are not retained.
+Selected data and cleanup directories use `0700`; regular JSON uses `0600`. State readers reject links, non-regular files, unsafe permissions, malformed schemas, and unknown entries. Baseline reports are not retained. Explicit source-candidate residue snapshots are retained as described below.
 
 ## Scanned roots
 
@@ -36,3 +36,25 @@ The exact Go cache remains at `$HOME/Library/Caches/go-build`. After full plan a
 ## Removal
 
 The uninstaller keeps the complete data directory. Removing retained state is outside the cleanup contract and requires a separately reviewed process.
+
+## Source candidate additions
+
+`residue/snapshots/` stores path-free explicit scan snapshots with a bounded
+history. The [residue contract](RESIDUE-CONTRACT.md) specifies count and byte
+limits and when comparisons are valid. Inspection output alone is not stored.
+
+`retire/` holds private registrations, exact target bindings, plans, approvals,
+protection state and receipts. These are separate from cache plans; IDs cannot
+be substituted between action namespaces. The
+[retirement contract](WORKTREE-RETIREMENT-CONTRACT.md) documents the exact schema
+and retained fields. The uninstaller also retains this state.
+
+Residue `--scope` explicitly selects supported project artifact inventory. It
+does not authorise deletion of those artifacts. Retirement `--target` selects
+one user-managed linked worktree for registration and evidence gathering;
+mutation still requires the exact approved plan and revalidation.
+
+Cache protection management retains disabled tombstones in `cleanup/protected/`
+and a private `cleanup/protection-generation.json` counter. These invalidate
+older plans. A source build and v0.1.1 should use separate `--data-dir` locations:
+the old binary intentionally rejects unfamiliar private state.

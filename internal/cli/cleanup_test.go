@@ -125,6 +125,13 @@ func TestExplainApplyHistoryTextAndJSON(t *testing.T) {
 		if code != cli.ExitOK || out == "" {
 			t.Fatalf("explain %s code=%d out=%q err=%q", format, code, out, errout)
 		}
+		if format == "text" {
+			for _, marker := range []string{"evidence:", "action availability:", "missing checks:", "rebuild trade-off:"} {
+				if !strings.Contains(out, marker) {
+					t.Fatalf("explain text missing %q: %s", marker, out)
+				}
+			}
+		}
 	}
 	_, planJSON, _ := runCleanup(t, []string{"plan", id, "--data-dir", data, "--format", "json"}, deps)
 	var p cleanup.Plan
@@ -163,6 +170,35 @@ func TestApplyTextOutput(t *testing.T) {
 	code, out, errout := runCleanup(t, []string{"apply", p.ID, "--format=text"}, deps)
 	if code != cli.ExitOK || !strings.Contains(out, "cleaned") || errout != "" {
 		t.Fatalf("code=%d out=%q err=%q data=%s", code, out, errout, data)
+	}
+	for _, marker := range []string{"logical cache-tree byte", "filesystem free-space"} {
+		if !strings.Contains(out, marker) {
+			t.Fatalf("apply text missing %q: %s", marker, out)
+		}
+	}
+}
+
+func TestScanTextUsesHumanSizesAndExplicitTotals(t *testing.T) {
+	deps, home, _ := cleanupDeps(t, false, "")
+	goRoot := filepath.Join(home, "Library/Caches/go-build")
+	if err := os.WriteFile(filepath.Join(goRoot, "large-fixture"), bytes.Repeat([]byte("x"), 2048), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(t.TempDir(), "outside")
+	if err := os.WriteFile(outside, []byte("outside"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(home, "Library/Caches/Homebrew", "partial-link")); err != nil {
+		t.Fatal(err)
+	}
+	code, out, errout := runCleanup(t, []string{"scan"}, deps)
+	if code != cli.ExitOK || errout != "" {
+		t.Fatalf("scan code=%d out=%q err=%q", code, out, errout)
+	}
+	for _, marker := range []string{"size=2.0 KiB", "partial", "unknown", "totals:", "exact="} {
+		if !strings.Contains(out, marker) {
+			t.Fatalf("scan text missing %q: %s", marker, out)
+		}
 	}
 }
 
@@ -254,6 +290,47 @@ func TestCleanRejectsMixedAllAndIDsWithoutMutation(t *testing.T) {
 	}
 }
 
+func TestBareCleanPromptsForFreshSelectionBeforePlanning(t *testing.T) {
+	deps, home, data := cleanupDeps(t, true, "")
+	engine := cleanup.Engine{Config: cleanup.Config{Home: home, DataDir: data, HostID: "cli-fixture-host", Now: deps.Now, GoCleaner: deps.GoCleaner}}
+	items, err := engine.Scan("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ordinal int
+	var selected cleanup.Candidate
+	for i, item := range items {
+		if item.Family == "go-build-cache" {
+			ordinal = i + 1
+			selected = item
+		}
+	}
+	p, err := engine.Plan(items, []string{selected.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deps.Stdin = strings.NewReader(fmt.Sprintf("%d\napply %s\n", ordinal, p.ID))
+	code, out, errout := runCleanup(t, []string{"clean"}, deps)
+	if code != cli.ExitOK || errout != "" {
+		t.Fatalf("bare clean code=%d out=%q err=%q", code, out, errout)
+	}
+	if !strings.Contains(out, "select candidates") || !strings.Contains(out, "cleaned") {
+		t.Fatalf("bare clean did not select and apply fresh choice: %s", out)
+	}
+}
+
+func TestCleanAllWithNoEligibleCandidatesIsUsefulNoAction(t *testing.T) {
+	deps, _, _ := cleanupDeps(t, true, "")
+	deps.CleanupHome = func() (string, error) { return t.TempDir(), nil }
+	code, out, errout := runCleanup(t, []string{"clean", "all"}, deps)
+	if code != cli.ExitOK || errout != "" {
+		t.Fatalf("empty clean code=%d out=%q err=%q", code, out, errout)
+	}
+	if !strings.Contains(out, "nothing to clean") {
+		t.Fatalf("empty clean output = %q", out)
+	}
+}
+
 func mustHome(t *testing.T, d cli.Dependencies) string {
 	v, e := d.CleanupHome()
 	if e != nil {
@@ -313,7 +390,7 @@ func TestHelpDocumentsExactCleanupSyntax(t *testing.T) {
 	if code != cli.ExitOK || errout != "" {
 		t.Fatalf("code=%d err=%q", code, errout)
 	}
-	for _, line := range []string{"scan [--scope PATH] [--format text|json]", "plan ID... | plan all-safe", "apply PLAN_ID", "clean [IDs...|all]", "protect ID", "history [--data-dir PATH]"} {
+	for _, line := range []string{"scan [--scope PATH] [--base REF]", "plan ID... | plan all-safe", "apply PLAN_ID", "clean [IDs...|all]", "protect ID", "history [--data-dir PATH]"} {
 		if !strings.Contains(out, line) {
 			t.Fatalf("help missing %q: %s", line, out)
 		}

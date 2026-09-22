@@ -25,3 +25,25 @@ StillMac does not store a copy of cache contents. The verified Go tool owns cach
 The default directory is `$HOME/Library/Application Support/StillMac`; `--data-dir` selects another. Reports go to standard output. StillMac transmits nothing. Callers control later sharing.
 
 Baseline sample retention remains bounded to 672 samples, 14 days relative to the newest valid sample, 2 MiB per sample, and 128 MiB total. Cleanup plans expire after 15 minutes. There is no scheduler.
+
+## M1/M2 source candidate
+
+Explicit residue scopes add only allowlisted artifact metadata and aggregate
+logical sizes. Public reports and stored snapshots use opaque scope/resource
+IDs, fixed reasons, measurement status and comparable deltas. They never retain
+project paths, artifact filenames or contents. `inspect` does not save history;
+`snapshot` does. `session-report` is explicitly invoked, with no installed hook
+or scheduler. Unknown and partial evidence remain labelled.
+
+Retirement is a separate private-state namespace. Revalidation requires exact
+registered target and primary-worktree paths, Git object/ref bindings, host and
+filesystem identity, owner attestations, plans and approvals. Public plans and
+receipts omit those paths. This private binding is a specific exception to
+path-free observation, not permission to collect agent conversations or content.
+See the [retirement contract](docs/WORKTREE-RETIREMENT-CONTRACT.md) for details.
+
+Local Skill preparation is a separate shell distribution surface. It copies
+only the supplied Skill source into an explicitly chosen new destination; it
+does not install the runtime, add hooks, call a network service or approve actions.
+An agent reading a report may have its own data-sharing behaviour, so only give
+it the path-free output needed for the task.
